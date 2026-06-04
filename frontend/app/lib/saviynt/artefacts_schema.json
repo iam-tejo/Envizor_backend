@@ -1,0 +1,151 @@
+[
+  {
+    "key": "securitySystems",
+    "resourceName": "saviynt_security_system",
+    "displayName": "Security Systems",
+    "fields": [
+      { "name": "id", "hclKey": "system_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "endpoints",
+    "resourceName": "saviynt_endpoint",
+    "displayName": "Endpoints",
+    "fields": [
+      { "name": "id", "hclKey": "endpoint_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "securitySystemId", "hclKey": "security_system_id", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "dynamicAttributes",
+    "resourceName": "saviynt_dynamic_attribute",
+    "displayName": "Dynamic Attributes",
+    "fields": [
+      { "name": "id", "hclKey": "attribute_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "value", "hclKey": "value", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "entitlementTypes",
+    "resourceName": "saviynt_entitlement_type",
+    "displayName": "Entitlement Types",
+    "fields": [
+      { "name": "id", "hclKey": "type_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "enterpriseRoles",
+    "resourceName": "saviynt_enterprise_role",
+    "displayName": "Enterprise Roles",
+    "fields": [
+      { "name": "id", "hclKey": "role_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "roles",
+    "resourceName": "saviynt_role",
+    "displayName": "Roles (Standard)",
+    "fields": [
+      { "name": "id", "hclKey": "role_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "entitlements",
+    "resourceName": "saviynt_entitlement",
+    "displayName": "Entitlements",
+    "fields": [
+      { "name": "id", "hclKey": "entitlement_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "entitlement_value", "hclKey": "entitlement_value", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "privileges",
+    "resourceName": "saviynt_privilege",
+    "displayName": "Privileges",
+    "fields": [
+      { "name": "id", "hclKey": "privilege_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "fileUploads",
+    "resourceName": "saviynt_file_upload",
+    "displayName": "File Uploads",
+    "fields": [
+      { "name": "id", "hclKey": "file_id", "type": "string" },
+      { "name": "fileName", "hclKey": "file_name", "type": "string" },
+      { "name": "fileSize", "hclKey": "file_size", "type": "number" },
+      { "name": "status", "hclKey": "status", "type": "string" }
+    ]
+  },
+  {
+    "key": "connections",
+    "resourceName": "saviynt_connection",
+    "displayName": "Connections",
+    "fields": [
+      { "name": "id", "hclKey": "connection_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "type", "hclKey": "type", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "jobs",
+    "resourceName": "saviynt_job",
+    "displayName": "Jobs & Tasks",
+    "fields": [
+      { "name": "id", "hclKey": "job_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "status", "hclKey": "status", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "rules",
+    "resourceName": "saviynt_rule",
+    "displayName": "Rules",
+    "fields": [
+      { "name": "id", "hclKey": "rule_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "transportPackages",
+    "resourceName": "saviynt_transport_package",
+    "displayName": "Transport Packages",
+    "fields": [
+      { "name": "id", "hclKey": "package_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "version", "hclKey": "version", "type": "string" },
+      { "name": "packagePath", "hclKey": "package_path", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  },
+  {
+    "key": "lookups",
+    "resourceName": "saviynt_lookup",
+    "displayName": "Lookups",
+    "fields": [
+      { "name": "id", "hclKey": "lookup_id", "type": "string" },
+      { "name": "name", "hclKey": "name", "type": "string" },
+      { "name": "value", "hclKey": "value", "type": "string" },
+      { "name": "description", "hclKey": "description", "type": "string" }
+    ]
+  }
+]

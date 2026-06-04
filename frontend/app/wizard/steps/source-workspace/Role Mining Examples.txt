@@ -1,0 +1,290 @@
+Scene 1 — CyberArk & Entra Role Mining
+1️⃣ Panel 1:  
+A Finance Manager stands beside a whiteboard showing “200 Finance Analysts” and icons for Entra and CyberArk.
+He says, “We’ve got 200 Finance Analysts with all sorts of access!”
+→ Sets up the problem: inconsistent permissions.
+
+2️⃣ Panel 2:  
+A Saviynt Analyst wearing a blue “SAVIYNT” cap and headset types at a computer, saying, “Let me check…”
+→ Runs the mining algorithm.
+The monitor shows “Mining Entra Groups & CyberArk Safes…”
+
+3️⃣ Panel 3:  
+The screen displays:
+“87 % have the same 14 permissions!”
+→ Reveals the common access cluster.
+Analyst says, “Looks like a Finance Analyst Role!”
+
+4️⃣ Panel 4:  
+The Finance Manager smiles and says, “Perfect! That makes sense!”
+→ Confirms business alignment.
+A badge below reads Entra & CyberArk Finance Analyst Role ✔️.
+
+🧠 Slide Notes
+Purpose: Demonstrate how Saviynt mines Entra and CyberArk entitlements to identify common access patterns.
+
+Key Takeaway: 87 % of users share identical permissions — ideal for a unified Finance Analyst Role.
+
+Impact: Simplifies provisioning, reduces audit complexity, and aligns IT and business.
+
+
+
+
+
+Slide 2 
+🧩 Concept
+Birthright roles automatically grant essential access to every employee based on HR attributes — no approvals, no manual steps.
+
+💡 Storyline
+HR Manager: “Every new hire needs email, VPN, and portal access.”
+
+Saviynt Analyst: “Let’s mine all users — 100 % already have those entitlements.”
+
+System Output: “Recommend: Base/Birthright Role.”
+
+HR Manager: “Perfect! Auto‑provision it for all employees.”
+
+🧠 Key Takeaways
+Birthright roles = baseline access for all users.
+
+Driven by HRMS attributes (department, employment type).
+
+Auto‑provisioned, no approval workflow.
+
+Simplifies onboarding and ensures consistency.
+
+🗣️ Presenter Notes
+Emphasise automation: “Saviynt provisions these instantly when HR data changes.”
+
+Highlight governance: “Birthright roles are auto‑certified and low‑risk.”
+
+Ask the audience: “What access should every employee in your company have by default?”
+
+🎨 Visual Idea
+A 4‑panel cartoon:
+
+HR Manager at a desk with “New Hire List.”
+
+Saviynt Analyst at computer saying “Mining access…”
+
+Screen shows “100 % users → Email, VPN, Portal.”
+
+HR Manager smiling: “Auto‑provision Birthright Role ✅.”
+
+
+Slide 3 — Usage Insights (CyberArk & Entra)
+“Seeing what’s used — and what’s not”
+💡 Storyline
+1️⃣ Panel 1 — IT Security Lead (concerned):  
+“Some users have CyberArk vaults and Entra groups they never touch!”
+→ Highlights dormant access.
+
+2️⃣ Panel 2 — Saviynt Analyst (focused):  
+“Running usage analytics across Entra and CyberArk…”
+→ Shows Saviynt analysing 90‑day activity logs.
+
+3️⃣ Panel 3 — System Output:  
+Screen displays:
+
+Entra Groups → 42 % Unused
+
+CyberArk Safes → 31 % Dormant
+
+High‑Risk Privileges → 18 % Never Used  
+Analyst says: “These are perfect candidates for cleanup!”
+
+4️⃣ Panel 4 — IT Security Lead (relieved):  
+“Excellent — let’s remove unused access and tighten controls.”
+A badge below reads CyberArk & Entra Usage Insights ✔️.
+
+🧠 Key Takeaways
+Usage‑driven visibility: Saviynt correlates Entra sign‑in and CyberArk vault activity.
+
+Risk reduction: Flags dormant or toxic entitlements before audits.
+
+Efficiency: Removes unnecessary access, simplifying certifications.
+
+Governance impact: Strengthens least‑privilege enforcement across hybrid systems.
+
+
+
+
+
+
+Slide 4
+🎬 Scene 4 — “Application Role Mining with Entra ID & CyberArk”
+🧩 Concept
+Saviynt mines fine‑grained entitlements from Entra ID (Azure AD) or CyberArk vaults and groups them into clean, governed Application Roles.
+
+💡 Storyline
+1️⃣ IT Owner: “We’ve got hundreds of Entra groups and CyberArk vault permissions — some used, some not!”
+2️⃣ Saviynt Analyst: “Let’s mine by entitlement type = Entra Group and CyberArk Safe.”
+3️⃣ System Output:
+
+Cluster A → Entra Reporting Groups
+
+Cluster B → CyberArk Finance Safes
+4️⃣ Analyst: “Recommend: Entra Reporting Role and CyberArk Finance Role.”
+5️⃣ IT Owner: “Perfect — clean roles, no privilege creep!”
+
+🧠 Key Takeaways
+Bottom‑up mining converts granular entitlements (groups, safes) into coarse‑grained roles.
+
+Saviynt automatically checks for SoD conflicts and unused access.
+
+Application Roles simplify certification and reduce risk across hybrid systems.
+
+🗣️ Presenter Notes
+“In this scene, the IT Owner faces hundreds of Entra groups and CyberArk permissions.
+Saviynt mines usage data, clusters similar entitlements, and recommends clean application roles.
+This ensures least‑privilege access and unified governance across cloud and privileged systems.”
+
+🎨 Visual Idea
+A 4‑panel cartoon:
+
+IT Owner overwhelmed by Entra groups and CyberArk vaults.
+
+Saviynt Analyst typing “Mining Entra Groups & CyberArk Safes…”
+
+Screen shows clusters labelled “Reporting” and “Finance.”
+
+Slide 5
+
+Scene 5 — “Business Role: Store Manager Across Apps”
+🧩 Concept
+Saviynt aggregates entitlements from multiple applications — Entra ID, CyberArk, HR Portal, and POS System — into a single Business Role that simplifies access and certification.
+
+💡 Storyline
+1️⃣ Operations Manager: “Our Store Managers need access to POS, Inventory, HR Portal, and Reporting.”
+2️⃣ Saviynt Analyst: “Let’s mine across all systems — Entra Groups, CyberArk Safes, HR Portal Roles, POS Permissions.”
+3️⃣ System Output:
+
+Cluster A → Store Manager Core Access
+
+Cluster B → Regional Manager Extended Access
+4️⃣ Analyst: “Recommend: Store Manager Business Role ✅.”
+5️⃣ Operations Manager: “Perfect — one role, multiple systems!”
+
+🧠 Key Takeaways
+Business Roles combine entitlements across applications.
+
+They simplify requests and certifications.
+
+They enforce least‑privilege access across enterprise systems.
+
+Ideal for cross‑functional positions like Store Manager, Project Lead, or Finance Controller.
+
+🗣️ Presenter Notes
+“In this scene, Saviynt mines access across Entra ID, CyberArk, HR Portal, and POS System.
+It clusters common entitlements and recommends a unified Store Manager Business Role.
+This reduces request complexity and ensures consistent access across applications.”
+
+🎨 Visual Idea
+A 4‑panel cartoon:
+
+Operations Manager listing required systems.
+
+Saviynt Analyst typing “Mining across Entra, CyberArk, HR, POS…”
+
+Screen showing clusters labelled “Store Manager Core” and “Regional Manager Extended.”
+
+Operations Manager smiling: “One role, multiple systems ✅.”
+
+
+Business Role Mining — Unified Access Across Systems
+“One Role, Unified Access”
+🧩 Purpose
+Show how Saviynt combines entitlements from Entra ID and CyberArk into a single, governed Business Role that simplifies provisioning and certification.
+
+🗣️ Narration Script
+“In this scene, our IT Manager highlights the challenge of leaders needing access to both Entra groups and CyberArk safes.
+The Saviynt Analyst mines entitlements across these systems, clustering them into logical groups — Core Leadership Access and Privileged Admin Access.
+Saviynt then recommends a unified Leader Access Role, ensuring consistent, least‑privilege access across cloud and privileged environments.”
+
+🧠 Key Takeaways
+Cross‑system mining: Saviynt analyses Entra ID groups and CyberArk safes together.
+
+Role recommendation: Clusters similar entitlements into one Business Role.
+
+Governance impact: Simplifies certification and reduces privilege creep.
+
+Outcome: Unified access model for hybrid identity and PAM ecosystems.
+
+🛠️ Saviynt Advantage
+Saviynt’s hybrid role‑mining engine uses usage analytics, risk scoring, and SoD checks to produce roles that are accurate, compliant, and easy to manage across Entra ID and CyberArk.
+
+
+Scene 6 — Usage‑Based Mining Cleanup
+
+Storyline
+1️⃣ Panel 1 — IT Security Lead (frustrated):  
+“Why do users have Entra groups and CyberArk safes they never use? Audits are painful!”
+
+2️⃣ Panel 2 — Saviynt Analyst (focused):  
+“Running usage‑based mining across Entra and CyberArk… analysing last 90 days of activity.”
+
+3️⃣ Panel 3 — System Output:
+
+45 % Unused Entra Groups
+
+28 % Dormant CyberArk Safes
+
+12 % High‑risk privileges never used
+Analyst says: “These are perfect candidates for cleanup!”
+
+4️⃣ Panel 4 — IT Security Lead (relieved):  
+“Finally! Let’s remove unused access and reduce risk.”
+A badge appears: Usage‑Based Cleanup Recommended ✔️
+
+🧠 Key Takeaways
+Usage‑driven intelligence: Saviynt correlates Entra sign‑in logs and CyberArk vault activity.
+
+Risk reduction: Flags dormant or toxic entitlements before audits.
+
+Efficiency: Removes unnecessary access, simplifying certifications.
+
+Governance impact: Enforces least‑privilege across cloud and privileged systems.
+
+🗣️ Presenter Notes
+“In this scene, Saviynt analyses 90‑day usage logs from Entra ID and CyberArk.
+It identifies unused groups and safes, highlighting high‑risk entitlements that have never been accessed.
+These insights drive cleanup recommendations, reducing audit findings and strengthening least‑privilege enforcement.”
+
+Slide 7 
+
+Scene 7 — Role Certification & Attestation
+“Certify what matters — clean, compliant roles”
+💡 Storyline
+1️⃣ Panel 1 — Compliance Manager (focused):  
+“Time for quarterly access reviews. We need to certify Entra and CyberArk roles!”
+
+2️⃣ Panel 2 — Saviynt Analyst (at workstation):  
+“Launching certification campaign… pulling clean roles from usage‑based mining results.”
+
+3️⃣ Panel 3 — System Output:  
+Screen shows:
+
+Entra Leader Role ✔️ Active & Used
+
+CyberArk Privileged Role ✔️ Validated
+
+Dormant Access ❌ Flagged for Removal  
+Analyst says: “Managers can now certify only what’s relevant.”
+
+4️⃣ Panel 4 — Compliance Manager (smiling):  
+“Perfect! Clean roles, fewer exceptions, faster audits.”
+A badge reads Role Certification Completed ✔️.
+
+🧠 Key Takeaways
+Automated campaigns: Saviynt triggers certifications based on mined and cleaned roles.
+
+Focused reviews: Managers see only active, relevant access.
+
+Audit readiness: Reduces exceptions and accelerates compliance cycles.
+
+Governance loop: Mining → Cleanup → Certification → Continuous Improvement.
+
+🗣️ Presenter Notes
+“In this scene, Saviynt uses mined and cleaned data from Entra ID and CyberArk to drive certification.
+Managers review only active roles, confirm legitimate access, and remove dormant entitlements.
+This closes the governance loop — ensuring every role is validated and compliant.”
