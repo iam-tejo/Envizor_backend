@@ -714,7 +714,7 @@ export default function RightDockedChatbot({
     const user = sessionStorage.getItem("envizor_username") || "user";
     const overriddenRoles = localStorage.getItem("envizor_custom_roles");
     const rolesMap = overriddenRoles ? JSON.parse(overriddenRoles) : {};
-    const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || "BasicUser";
+    const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (user.toLowerCase() === "admin" ? "SuperAdmin" : "BasicUser");
     setUserRole(latestRole);
     setUserName(user);
 
@@ -782,7 +782,7 @@ export default function RightDockedChatbot({
       checkJit();
       const overriddenRoles = localStorage.getItem("envizor_custom_roles");
       const rolesMap = overriddenRoles ? JSON.parse(overriddenRoles) : {};
-      setUserRole(rolesMap[userName.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || "BasicUser");
+      setUserRole(rolesMap[userName.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (userName.toLowerCase() === "admin" ? "SuperAdmin" : "BasicUser"));
       const allPerms = localStorage.getItem("envizor_user_permissions");
       const permsMap = allPerms ? JSON.parse(allPerms) : {};
       setUserPermissions(permsMap[userName.toLowerCase()] || ["tile-know-more"]);
