@@ -1151,16 +1151,38 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
       // Smart extraction of target file from prompt if not explicitly selected
       else {
         if (!targetFilePath) {
-          if (lower.includes("baseline/page.tsx") || lower.includes("baseline page")) {
-            targetFilePath = "app/wizard/day0/baseline/page.tsx";
-          } else if (lower.includes("layout.tsx") || lower.includes("layout")) {
-            targetFilePath = "app/wizard/layout.tsx";
-          } else if (lower.includes("globals.css") || lower.includes("css")) {
-            targetFilePath = "app/globals.css";
+          const fileMatch = prompt.match(/\bin\s+([\w\-\.\/]+)\b/i) || prompt.match(/\binside\s+([\w\-\.\/]+)\b/i) || prompt.match(/\bto\s+([\w\-\.\/]+)\b/i);
+          if (fileMatch && fileMatch[1]) {
+            const potentialPath = fileMatch[1].trim();
+            const checkPath = getSafePath(potentialPath);
+            if (fs.existsSync(checkPath)) {
+              targetFilePath = potentialPath;
+            } else {
+              const appPath = path.join("app", potentialPath);
+              if (fs.existsSync(getSafePath(appPath))) {
+                targetFilePath = appPath;
+              }
+            }
+          }
+          
+          if (!targetFilePath && activeFile) {
+            targetFilePath = activeFile;
+          }
+          
+          if (!targetFilePath) {
+            if (lower.includes("baseline/page.tsx") || lower.includes("baseline page")) {
+              targetFilePath = "app/wizard/day0/baseline/page.tsx";
+            } else if (lower.includes("layout.tsx") || lower.includes("layout")) {
+              targetFilePath = "app/wizard/layout.tsx";
+            } else if (lower.includes("globals.css") || lower.includes("css")) {
+              targetFilePath = "app/globals.css";
+            }
           }
         }
 
-        if (targetFilePath && (lower.includes("comment") || lower.includes("add") || lower.includes("modify") || lower.includes("change"))) {
+        const isEditingPrompt = lower.includes("comment") || lower.includes("add") || lower.includes("modify") || lower.includes("change") || lower.includes("replace") || lower.includes("insert") || lower.includes("remove") || lower.includes("disable");
+
+        if (targetFilePath && isEditingPrompt) {
           let original = "";
           let foundFile = false;
 
@@ -1185,16 +1207,33 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
               status: "SUCCESS"
             });
 
-            // Perform a safe edit (inject comment at line 1)
-            const commentText = `// Envizor AI Agent Staged Mod: ${prompt}\n`;
-            if (!original.startsWith("// Envizor AI Agent Staged Mod")) {
-              const modified = commentText + original;
-
+            const editResult = executeSemanticCodeEdit(prompt, original, targetFilePath);
+            if (editResult.success) {
+              const modified = editResult.modified;
               hasChanges = true;
               modifiedContent = modified;
-              diffReport = `--- a/${path.basename(targetFilePath)}\n+++ b/${path.basename(targetFilePath)}\n@@ -1,3 +1,4 @@\n+${commentText} ${original.slice(0, 100)}...`;
+              
+              const originalLines = original.split("\n");
+              const modifiedLines = modified.split("\n");
+              diffReport = `--- a/${path.basename(targetFilePath)}\n+++ b/${path.basename(targetFilePath)}\n`;
+              if (editResult.actionDetails) {
+                diffReport += `@@ -action: ${editResult.actionDetails} @@\n`;
+              }
+              
+              let diffLines = 0;
+              for (let i = 0; i < Math.max(originalLines.length, modifiedLines.length) && diffLines < 15; i++) {
+                if (originalLines[i] !== modifiedLines[i]) {
+                  if (originalLines[i] !== undefined) {
+                    diffReport += `-${originalLines[i]}\n`;
+                    diffLines++;
+                  }
+                  if (modifiedLines[i] !== undefined) {
+                    diffReport += `+${modifiedLines[i]}\n`;
+                    diffLines++;
+                  }
+                }
+              }
 
-              // If user explicitly asks to apply immediately
               if (lower.includes("write") || lower.includes("apply") || lower.includes("force")) {
                 if (isRemoteMode) {
                   await commitGithubFile(githubRepo, githubToken, githubBranch, targetFilePath, modified, `🤖 Envizor AI Agent: Write ${targetFilePath}`);
@@ -1208,19 +1247,45 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
                   target: targetFilePath,
                   status: "SUCCESS"
                 });
-                responseText = `🧠 **AI Agent Brain Execution Success!**\n\nI processed your request, identified the target file at \`${targetFilePath}\`, and committed the changes directly to your repository.\n\n* **Actions taken:**\n  1. Read \`${targetFilePath}\`\n  2. Injected comment token at line 1\n  3. Wrote changes to branch \`${githubBranch}\`\n\n* **Next steps:** Monitor your Vercel deployment tracking panel.`;
+                responseText = `🧠 **AI Agent Brain Execution Success!**\n\nI processed your request, identified the target file at \`${targetFilePath}\`, and applied the edits.\n\n* **Action Details:**\n  ${editResult.actionDetails}\n\n* **Next steps:** Monitor Vercel build status.`;
               } else {
-                responseText = `🧠 **AI Agent Brain Staging Complete!**\n\nI have read \`${targetFilePath}\` and generated the staged code modification. Please inspect the **Staged Edits Diff** panel on the right and click **Apply & Save to Local Workspace** to commit this change to ${isAdo ? 'Azure DevOps' : 'GitHub'}!`;
+                responseText = `🧠 **AI Agent Brain Staging Complete!**\n\nI have parsed your prompt and staged the code modifications for \`${targetFilePath}\`.\n\n* **Action details:** ${editResult.actionDetails}\n\n* **Next steps:** Please inspect the **Staged Edits Diff** panel on the right and click **Apply & Save** to write changes!`;
               }
             } else {
-              responseText = `🧠 **AI Agent Brain Insight:**\n\nThe target file \`${targetFilePath}\` already contains a recently staged AI Agent modification header. No redundant edits were committed.`;
+              responseText = `🧠 **AI Agent Brain Insight:**\n\nI analyzed your prompt for edits on \`${targetFilePath}\`, but couldn't parse a specific code change request (e.g. replace, add, comment). No edits were staged.`;
             }
           } else {
             responseText = `🧠 **AI Agent Brain Error:**\n\nI resolved the target file path to \`${targetFilePath}\` but could not locate it on your remote ${isAdo ? 'Azure DevOps' : 'GitHub'} repository or local workspace.`;
           }
         } else {
-          // General free-form agent chat response explaining its capabilities
-          responseText = `🧠 **AI Agent Brain Hub Activated!**\n\nI have access to your workspace files. \n\n* **Mode Active:** ${isAdo ? `🐙 Remote Azure DevOps (Repo: ${githubRepo}, Branch: ${githubBranch})` : (isRemoteMode ? `🐙 Remote GitHub (Repo: ${githubRepo}, Branch: ${githubBranch})` : `💻 Local Filesystem`)}\n\n* **What I can do:**\n  - Read and analyze files in your active workspace.\n  - Stage code modifications (such as injecting baseline configurations, commenting code, or editing components).\n  - Apply changes directly to your local workspace or commit them straight to ${isAdo ? 'Azure DevOps' : 'GitHub'}.\n  - Monitor Vercel production deployment links.\n\n* **Try asking me:**\n  - *"Add a developer comment to the baseline page"* or\n  - *"Add one more theme"*`;
+          // General free-form agent chat response explaining its capabilities or searching workspace
+          let matchedTech = "";
+          if (lower.includes("spring") || lower.includes("java") || lower.includes("maven") || lower.includes("pom.xml")) {
+            matchedTech = "spring";
+          } else if (lower.includes("react") || lower.includes("next") || lower.includes("tailwind") || lower.includes("globals.css")) {
+            matchedTech = "react";
+          } else if (lower.includes("terraform") || lower.includes("hcl") || lower.includes("workspace")) {
+            matchedTech = "terraform";
+          } else if (lower.includes("saviynt") || lower.includes("api") || lower.includes("endpoint")) {
+            matchedTech = "saviynt";
+          }
+
+          if (matchedTech) {
+            responseText = await offlineDeveloperKnowledge(matchedTech);
+          } else {
+            const searchTerms = prompt.split(/\s+/).filter((word: string) => word.length > 4 && !/^(about|there|where|which|should|would|could|hello|please|agent)/i.test(word));
+            if (searchTerms.length > 0) {
+              const queryTerm = searchTerms[0];
+              const searchResults = localSearchWorkspace(queryTerm);
+              if (searchResults && !searchResults.includes("No matching lines found")) {
+                responseText = `🧠 **AI Agent Brain Search Analysis:**\n\nI scanned the active workspace files for details matching your query and found the following relevant occurrences:\n\n${searchResults}`;
+              } else {
+                responseText = `🧠 **AI Agent Brain Activated!**\n\nI have access to your workspace files. \n\n* **Mode Active:** ${isAdo ? `🐙 Remote Azure DevOps (Repo: ${githubRepo}, Branch: ${githubBranch})` : (isRemoteMode ? `🐙 Remote GitHub (Repo: ${githubRepo}, Branch: ${githubBranch})` : `💻 Local Filesystem`)}\n\n* **What I can do:**\n  - Read and analyze files in your active workspace.\n  - Stage code modifications (such as injecting baseline configurations, commenting code, or editing components).\n  - Apply changes directly to your local workspace or commit them straight to ${isAdo ? 'Azure DevOps' : 'GitHub'}.\n  - Monitor Vercel production deployment links.\n\n* **Try asking me:**\n  - *"Add a developer comment to the baseline page"* or\n  - *"find wizard"*`;
+              }
+            } else {
+              responseText = `🧠 **AI Agent Brain Activated!**\n\nI have access to your workspace files. \n\n* **Mode Active:** ${isAdo ? `🐙 Remote Azure DevOps (Repo: ${githubRepo}, Branch: ${githubBranch})` : (isRemoteMode ? `🐙 Remote GitHub (Repo: ${githubRepo}, Branch: ${githubBranch})` : `💻 Local Filesystem`)}\n\n* **What I can do:**\n  - Read and analyze files in your active workspace.\n  - Stage code modifications (such as injecting baseline configurations, commenting code, or editing components).\n  - Apply changes directly to your local workspace or commit them straight to ${isAdo ? 'Azure DevOps' : 'GitHub'}.\n  - Monitor Vercel production deployment links.\n\n* **Try asking me:**\n  - *"Add a developer comment to the baseline page"* or\n  - *"find wizard"*`;
+            }
+          }
         }
       }
 
@@ -1240,5 +1305,142 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
     console.error("Local Agent API Route Error:", err);
     return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
   }
+}
+
+function executeSemanticCodeEdit(prompt: string, fileContent: string, filePath: string) {
+  const lower = prompt.toLowerCase();
+  let modified = fileContent;
+  let summary = "";
+  let success = false;
+  let actionDetails = "";
+
+  const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Case 1: Replace command
+  const replaceRegex = /replace\s+['"`](.*?)['"`]\s+with\s+['"`](.*?)['"`]/i;
+  const changeRegex = /change\s+['"`](.*?)['"`]\s+to\s+['"`](.*?)['"`]/i;
+  let match = prompt.match(replaceRegex) || prompt.match(changeRegex);
+  
+  if (!match) {
+    const simpleReplace = /replace\s+(.*?)\s+with\s+(.*)/i;
+    const simpleChange = /change\s+(.*?)\s+to\s+(.*)/i;
+    match = prompt.match(simpleReplace) || prompt.match(simpleChange);
+  }
+
+  if (match && match[1] && match[2]) {
+    const target = match[1].trim();
+    const replacement = match[2].trim();
+    
+    if (fileContent.includes(target)) {
+      modified = fileContent.split(target).join(replacement);
+      success = true;
+      actionDetails = `Replaced \`${target}\` with \`${replacement}\``;
+    } else {
+      const regex = new RegExp(escapeRegExp(target), "gi");
+      if (fileContent.match(regex)) {
+        modified = fileContent.replace(regex, replacement);
+        success = true;
+        actionDetails = `Replaced \`${target}\` (case-insensitive) with \`${replacement}\``;
+      }
+    }
+  }
+
+  // Case 2: Insert Below command
+  if (!success) {
+    const belowRegex = /(?:add|insert)\s+['"`](.*?)['"`]\s+below\s+['"`](.*?)['"`]/i;
+    const simpleBelow = /(?:add|insert)\s+(.*?)\s+below\s+(.*)/i;
+    const belowMatch = prompt.match(belowRegex) || prompt.match(simpleBelow);
+
+    if (belowMatch && belowMatch[1] && belowMatch[2]) {
+      const codeToInsert = belowMatch[1].trim();
+      const marker = belowMatch[2].trim();
+      
+      const lines = fileContent.split("\n");
+      const markerIndex = lines.findIndex(l => l.includes(marker));
+      
+      if (markerIndex !== -1) {
+        const markerLine = lines[markerIndex];
+        const indent = markerLine.match(/^\s*/)?.[0] || "";
+        lines.splice(markerIndex + 1, 0, indent + codeToInsert);
+        modified = lines.join("\n");
+        success = true;
+        actionDetails = `Inserted \`${codeToInsert}\` below \`${marker}\``;
+      }
+    }
+  }
+
+  // Case 3: Insert Above command
+  if (!success) {
+    const aboveRegex = /(?:add|insert)\s+['"`](.*?)['"`]\s+above\s+['"`](.*?)['"`]/i;
+    const simpleAbove = /(?:add|insert)\s+(.*?)\s+above\s+(.*)/i;
+    const aboveMatch = prompt.match(aboveRegex) || prompt.match(simpleAbove);
+
+    if (aboveMatch && aboveMatch[1] && aboveMatch[2]) {
+      const codeToInsert = aboveMatch[1].trim();
+      const marker = aboveMatch[2].trim();
+      
+      const lines = fileContent.split("\n");
+      const markerIndex = lines.findIndex(l => l.includes(marker));
+      
+      if (markerIndex !== -1) {
+        const markerLine = lines[markerIndex];
+        const indent = markerLine.match(/^\s*/)?.[0] || "";
+        lines.splice(markerIndex, 0, indent + codeToInsert);
+        modified = lines.join("\n");
+        success = true;
+        actionDetails = `Inserted \`${codeToInsert}\` above \`${marker}\``;
+      }
+    }
+  }
+
+  // Case 4: Comment out command
+  if (!success && (lower.includes("comment out") || lower.includes("disable") || lower.includes("remove"))) {
+    const commentRegex = /(?:comment out|disable|remove)\s+['"`](.*?)['"`]/i;
+    const simpleComment = /(?:comment out|disable|remove)\s+(.*)/i;
+    const commentMatch = prompt.match(commentRegex) || prompt.match(simpleComment);
+
+    if (commentMatch && commentMatch[1]) {
+      const target = commentMatch[1].trim();
+      const lines = fileContent.split("\n");
+      let matchesCount = 0;
+      
+      const updatedLines = lines.map(line => {
+        if (line.includes(target) && !line.trim().startsWith("//") && !line.trim().startsWith("/*")) {
+          matchesCount++;
+          if (filePath.endsWith(".css")) {
+            return line.replace(/(\s*)(.*)/, "$1/* $2 */");
+          } else if (filePath.endsWith(".html") || filePath.endsWith(".xml")) {
+            return line.replace(/(\s*)(.*)/, "$1<!-- $2 -->");
+          } else {
+            return line.replace(/(\s*)(.*)/, "$1// $2");
+          }
+        }
+        return line;
+      });
+
+      if (matchesCount > 0) {
+        modified = updatedLines.join("\n");
+        success = true;
+        actionDetails = `Commented out lines containing \`${target}\``;
+      }
+    }
+  }
+
+  // Fallback Case 5: Add a developer comment
+  if (!success && (lower.includes("comment") || lower.includes("edit") || lower.includes("modify") || lower.includes("change"))) {
+    const commentText = `// 🤖 Envizor AI Agent Local Mod: ${prompt.replace(/"/g, "'")} (Modified on ${new Date().toLocaleDateString()})\n`;
+    if (!fileContent.startsWith("// 🤖 Envizor AI Agent Local Mod")) {
+      modified = commentText + fileContent;
+      success = true;
+      actionDetails = `Injected developer comment at Line 1`;
+    }
+  }
+
+  return {
+    success,
+    modified,
+    summary,
+    actionDetails
+  };
 }
 
