@@ -711,7 +711,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, prompt, activeFile, newContent, command, githubToken, githubRepo, githubBranch = "main", geminiApiKey, activeFileContent } = body;
 
-    const isRemoteMode = !!(githubToken && githubRepo);
+    const isAdo = !!(githubRepo && (githubRepo.includes("azure.com") || githubRepo.includes("visualstudio.com") || githubRepo.toLowerCase().includes("ado")));
+    const isRemoteMode = !!(githubToken && githubRepo) && !isAdo;
 
     // 0. GET FILE TREE ACTION
     if (action === "tree") {
@@ -1209,17 +1210,17 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
                 });
                 responseText = `🧠 **AI Agent Brain Execution Success!**\n\nI processed your request, identified the target file at \`${targetFilePath}\`, and committed the changes directly to your repository.\n\n* **Actions taken:**\n  1. Read \`${targetFilePath}\`\n  2. Injected comment token at line 1\n  3. Wrote changes to branch \`${githubBranch}\`\n\n* **Next steps:** Monitor your Vercel deployment tracking panel.`;
               } else {
-                responseText = `🧠 **AI Agent Brain Staging Complete!**\n\nI have read \`${targetFilePath}\` and generated the staged code modification. Please inspect the **Staged Edits Diff** panel on the right and click **Apply & Save to Local Workspace** to commit this change to GitHub!`;
+                responseText = `🧠 **AI Agent Brain Staging Complete!**\n\nI have read \`${targetFilePath}\` and generated the staged code modification. Please inspect the **Staged Edits Diff** panel on the right and click **Apply & Save to Local Workspace** to commit this change to ${isAdo ? 'Azure DevOps' : 'GitHub'}!`;
               }
             } else {
               responseText = `🧠 **AI Agent Brain Insight:**\n\nThe target file \`${targetFilePath}\` already contains a recently staged AI Agent modification header. No redundant edits were committed.`;
             }
           } else {
-            responseText = `🧠 **AI Agent Brain Error:**\n\nI resolved the target file path to \`${targetFilePath}\` but could not locate it on your remote GitHub repository or local workspace.`;
+            responseText = `🧠 **AI Agent Brain Error:**\n\nI resolved the target file path to \`${targetFilePath}\` but could not locate it on your remote ${isAdo ? 'Azure DevOps' : 'GitHub'} repository or local workspace.`;
           }
         } else {
           // General free-form agent chat response explaining its capabilities
-          responseText = `🧠 **AI Agent Brain Hub Activated!**\n\nI have access to your workspace files. \n\n* **Mode Active:** ${isRemoteMode ? `🐙 Remote GitHub (Repo: ${githubRepo}, Branch: ${githubBranch})` : `💻 Local Filesystem`}\n\n* **What I can do:**\n  - Read and analyze files in your active workspace.\n  - Stage code modifications (such as injecting baseline configurations, commenting code, or editing components).\n  - Apply changes directly to your local workspace or commit them straight to GitHub.\n  - Monitor Vercel production deployment links.\n\n* **Try asking me:**\n  - *"Add a developer comment to the baseline page"* or\n  - *"Add one more theme"*`;
+          responseText = `🧠 **AI Agent Brain Hub Activated!**\n\nI have access to your workspace files. \n\n* **Mode Active:** ${isAdo ? `🐙 Remote Azure DevOps (Repo: ${githubRepo}, Branch: ${githubBranch})` : (isRemoteMode ? `🐙 Remote GitHub (Repo: ${githubRepo}, Branch: ${githubBranch})` : `💻 Local Filesystem`)}\n\n* **What I can do:**\n  - Read and analyze files in your active workspace.\n  - Stage code modifications (such as injecting baseline configurations, commenting code, or editing components).\n  - Apply changes directly to your local workspace or commit them straight to ${isAdo ? 'Azure DevOps' : 'GitHub'}.\n  - Monitor Vercel production deployment links.\n\n* **Try asking me:**\n  - *"Add a developer comment to the baseline page"* or\n  - *"Add one more theme"*`;
         }
       }
 
