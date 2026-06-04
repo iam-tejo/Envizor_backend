@@ -44,3 +44,7 @@ frontend/next-env.d.ts
 # OS files
 .DS_Store
 Thumbs.db
+
+# cloned workspaces
+terraform-workspaces-remote/
+frontend/terraform-workspaces-remote/
