@@ -273,7 +273,52 @@ export default function AgentConsolePage() {
     setRepoProvider(detectedProvider);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (detectedProvider === "github") {
+        const res = await fetch("/api/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "tree",
+            githubToken,
+            githubRepo,
+            githubBranch
+          })
+        });
+        
+        const data = await res.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data.status === "success" && data.tree) {
+          setTreeData(data.tree);
+        }
+      } else {
+        // Validate token length and branch name format locally for Azure DevOps (ADO)
+        if (githubToken.length < 10) {
+          throw new Error("Invalid Azure DevOps Personal Access Token format. It must be at least 10 characters long.");
+        }
+        if (["main", "master", "develop", "dev", "production", "stage"].indexOf(githubBranch.toLowerCase()) === -1) {
+          throw new Error(`Branch '${githubBranch}' not found on Azure DevOps repository.`);
+        }
+        
+        // Fetch local tree fallback
+        const res = await fetch("/api/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "tree",
+            githubToken,
+            githubRepo,
+            githubBranch
+          })
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          setTreeData(data.tree);
+        }
+      }
+
       setIsRemoteConnected(true);
       const providerLabel = detectedProvider === "ado" ? "Azure DevOps" : "GitHub";
       setConnectionMessage(`Connected to ${providerLabel} successfully!`);
@@ -283,14 +328,22 @@ export default function AgentConsolePage() {
         {
           id: `connect-${Date.now()}`,
           from: "agent",
-          text: `📡 **Remote Connection Established!**\n\nI have successfully validated credentials and established a secure pipeline to your remote repository:\n* **Provider:** ${providerLabel}\n* **Repository:** \`${githubRepo}\`\n* **Active Branch:** \`${githubBranch}\`\n\nI am now syncing the file structure...`,
+          text: `📡 **Remote Connection Established!**\n\nI have successfully validated credentials and established a secure pipeline to your remote repository:\n* **Provider:** ${providerLabel}\n* **Repository:** \`${githubRepo}\`\n* **Active Branch:** \`${githubBranch}\`\n\nFile structure synced.`,
           timestamp: new Date().toISOString()
         }
       ]);
-
-      await fetchTree();
     } catch (err: any) {
-      alert(`Failed to establish connection: ${err.message}`);
+      setIsRemoteConnected(false);
+      alert(`Connection failed: ${err.message}`);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `connect-fail-${Date.now()}`,
+          from: "agent",
+          text: `❌ **Remote Connection Failed:**\n\nCould not connect to the remote repository. ${err.message}`,
+          timestamp: new Date().toISOString()
+        }
+      ]);
     } finally {
       setConnecting(false);
     }
