@@ -730,7 +730,7 @@ export default function RightDockedChatbot({
     if (savedMessages) {
       setMessages(JSON.parse(savedMessages));
     } else {
-      initGreeting();
+      initGreeting(latestRole, user);
     }
 
     const savedFlow = sessionStorage.getItem("envizor_chat_flow");
@@ -1067,7 +1067,7 @@ export default function RightDockedChatbot({
   };
 
   // ─── Greeting ─────────────────────────────────────────────────────────────
-  const initGreeting = () => {
+  const initGreeting = (role: string = userRole, name: string = userName) => {
     let contextText = "";
     if (pathname?.includes("know-more")) {
       contextText = "You're exploring the **Ecosystem Guide** — I can explain any part of the pipeline in detail!";
@@ -1081,13 +1081,13 @@ export default function RightDockedChatbot({
       contextText = "I'm **Envy**, your Envizor AI guide. I know everything about the platform — ask me anything, request access to locked tools, or play the IaC governance trivia game!";
     }
 
-    const isBasicUser = userRole === "BasicUser";
+    const isBasicUser = role === "BasicUser";
 
     setMessages([
       {
         id: "greet",
         from: "bot",
-        text: `👋 **Hello${userName !== "user" ? `, ${userName}` : ""}! Welcome to the Envizor Assistant.**\n\n${contextText}${isBasicUser ? "\n\n🔒 Your tiles are currently locked as **BasicUser** — ask me to **unlock your access** or **request a role** and I'll handle it right here!" : ""}`,
+        text: `👋 **Hello${name !== "user" ? `, ${name}` : ""}! Welcome to the Envizor Assistant.**\n\n${contextText}${isBasicUser ? "\n\n🔒 Your tiles are currently locked as **BasicUser** — ask me to **unlock your access** or **request a role** and I'll handle it right here!" : ""}`,
         options: [
           { label: "🚀 Start Interactive Deploy Flow", actionName: "deploy", desc: "Guided step-by-step credentials pulls, plans, and deployments" },
           { label: "📦 Baseline Workspace — Day 0", actionName: "baseline_start", desc: "Discover Saviynt tenants and baseline Terraform configurations" },
