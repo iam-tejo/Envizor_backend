@@ -380,3 +380,29 @@ body {
 [data-theme="light"] .text-slate-500 {
   color: var(--text-muted) !important;
 }
+
+
+/* ── LAVENDER ── */
+[data-theme="lavender"] {
+  --bg-base:        #0f0b1a;
+  --bg-surface:     #1a122e;
+  --bg-panel:       #271b44;
+  --bg-elevated:    #35245c;
+  --border:         #4c3478;
+  --border-subtle:  #271b44;
+  --text-primary:   #f5f3ff;
+  --text-secondary: #ddd6fe;
+  --text-muted:     #a78bfa;
+  --accent:         #8b5cf6;
+  --accent-glow:    rgba(139,92,246,0.25);
+  --accent-hover:   #7c3aed;
+  --code-bg:        #0a0712;
+  --code-text:      #e9d5ff;
+  --success:        #10b981;
+  --warning:        #f59e0b;
+  --danger:         #ef4444;
+  --tag-bg:         rgba(139,92,246,0.15);
+  --tag-text:       #f3e8ff;
+  --scrollbar:      #4c3478;
+  --scrollbar-thumb:#8b5cf6;
+}
