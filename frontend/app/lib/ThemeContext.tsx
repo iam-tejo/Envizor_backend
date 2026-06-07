@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type ThemeId = "dark" | "light" | "ocean" | "cyberpunk" | "forest" | "sunset";
+export type ThemeId = "dark" | "light" | "ocean" | "cyberpunk" | "forest" | "sunset" | "lavender";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -12,13 +12,12 @@ export interface ThemeMeta {
 }
 
 export const THEMES: ThemeMeta[] = [
-  { id: "dark",      label: "Dark",      accent: "#1e293b", emoji: "🌑" },
+{ id: "dark",      label: "Dark",      accent: "#1e293b", emoji: "🌑" },
   { id: "light",     label: "Light",     accent: "#f8fafc", emoji: "☀️"  },
   { id: "ocean",     label: "Ocean",     accent: "#0c4a6e", emoji: "🌊" },
   { id: "cyberpunk", label: "Cyberpunk", accent: "#18011a", emoji: "⚡" },
   { id: "forest",    label: "Forest",    accent: "#052e16", emoji: "🌿" },
-  { id: "sunset",    label: "Sunset",    accent: "#781a08", emoji: "🌇" },
-
+  { id: "sunset",    label: "Sunset",    accent: "#781a08", emoji: "🌇" },    { id: "lavender", label: "Lavender", accent: "#8b5cf6", emoji: "🪻" },
 ];
 
 const STORAGE_KEY = "envizor_theme";
