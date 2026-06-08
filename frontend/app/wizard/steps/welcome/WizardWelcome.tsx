@@ -23,6 +23,7 @@ export default function WizardWelcome() {
   const [justification, setJustification] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showDay0WarningModal, setShowDay0WarningModal] = useState(false);
 
   // Access Duration Strategy (JIT vs Permanent)
   const [isJit, setIsJit] = useState(true);
@@ -123,6 +124,8 @@ export default function WizardWelcome() {
       setIsJit(true);
       setJitDuration(240);
       setSuccessMessage(null);
+    } else if (tileId === "tile-day0-setup") {
+      setShowDay0WarningModal(true);
     } else {
       router.push(href);
     }
@@ -213,6 +216,13 @@ export default function WizardWelcome() {
       description: "Generate and onboard SCIM, REST, Database, and File application integration JSON configurations."
     },
     {
+      id: "tile-disconnected-app-onboarding",
+      name: "Disconnected Application Onboarding",
+      gradient: "from-teal-500 to-emerald-600",
+      href: "/wizard/disconnected-onboarding",
+      description: "Onboard systems without APIs. The AI Agent logs in with credentials, extracts access, creates Saviynt connections, and automates provisioning tasks."
+    },
+    {
       id: "tile-analytics",
       name: "Analytics & Insights",
       gradient: "from-emerald-400 to-emerald-600",
@@ -225,6 +235,13 @@ export default function WizardWelcome() {
       gradient: "from-amber-400 via-orange-500 to-red-500",
       href: "/wizard/agent",
       description: "Chat directly with Envizor's agentic brain, inspect the local filesystem, stage and apply live code modifications."
+    },
+    {
+      id: "tile-deploy-agent",
+      name: "Deploy through Agent",
+      gradient: "from-pink-500 via-purple-600 to-indigo-600",
+      href: "/wizard/deploy-agent",
+      description: "Run automated deployments, manage sync schedules between environments (DEV -> PRE -> PROD), and view/approve staged changes."
     }
   ];
 
@@ -661,6 +678,98 @@ export default function WizardWelcome() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {showDay0WarningModal && (
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 animate-fadeIn p-4" style={{ backgroundColor: "rgba(0,0,0,0.65)" }}>
+          <div 
+            className="border rounded-2xl max-w-lg w-full shadow-2xl relative flex flex-col transition-colors overflow-hidden animate-fade-in"
+            style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border)" }}
+          >
+            {/* Header Gradient bar */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500" />
+            
+            <div className="p-6 space-y-6">
+              {/* Icon & Title */}
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/30 text-2xl animate-pulse">
+                  ⚠️
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-100">
+                    Day 0 Workspace Setup Advisor
+                  </h3>
+                  <p className="text-[10px] text-amber-400 font-semibold tracking-wider uppercase mt-0.5">
+                    Start from scratch advisory
+                  </p>
+                </div>
+              </div>
+
+              {/* Message */}
+              <div className="text-xs text-slate-350 space-y-2.5 leading-relaxed">
+                <p>
+                  This setup utility is designed strictly for initializing a <strong>blank workspace from scratch</strong> (mapping boundary dependencies &amp; importing initial configuration schemas).
+                </p>
+                <p className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] text-slate-400">
+                  💡 If you want to perform <strong>deployments</strong>, push config changes, or run plan/apply operations, click on the <strong>DevOps Terraform Wizard</strong> instead.
+                </p>
+              </div>
+
+              {/* Actions Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {/* Day 0 Setup */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDay0WarningModal(false);
+                    router.push("/wizard/day0-setup");
+                  }}
+                  className="group cursor-pointer border border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700 p-4 rounded-xl text-left transition-all flex flex-col justify-between min-h-[90px]"
+                >
+                  <div className="flex justify-between items-center w-full">
+                    <span className="text-lg">⚙️</span>
+                    <span className="text-[9px] uppercase font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Day 0 Only</span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-xs font-bold text-slate-200 group-hover:text-slate-100">Go to Day 0 Setup</span>
+                    <p className="text-[9.5px] text-slate-500 leading-tight mt-0.5">Initialize a blank repository workspace.</p>
+                  </div>
+                </button>
+
+                {/* DevOps Wizard */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDay0WarningModal(false);
+                    router.push("/wizard/home");
+                  }}
+                  className="group cursor-pointer border border-sky-500/30 bg-sky-950/20 hover:bg-sky-950/40 hover:border-sky-500/50 p-4 rounded-xl text-left transition-all flex flex-col justify-between min-h-[90px]"
+                >
+                  <div className="flex justify-between items-center w-full">
+                    <span className="text-lg">🚀</span>
+                    <span className="text-[9px] uppercase font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Recommended</span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-xs font-bold text-sky-400 group-hover:text-sky-300">DevOps Terraform Wizard</span>
+                    <p className="text-[9.5px] text-slate-400 leading-tight mt-0.5">Deploy or update configurations safely.</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t px-6 py-4 bg-slate-900/20 flex justify-end" style={{ borderColor: "var(--border)" }}>
+              <button
+                type="button"
+                onClick={() => setShowDay0WarningModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-950 border hover:bg-slate-900 text-slate-350 transition cursor-pointer"
+                style={{ borderColor: "var(--border)" }}
+              >
+                Close / Dismiss
+              </button>
+            </div>
           </div>
         </div>
       )}

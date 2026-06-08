@@ -30,7 +30,44 @@ export default function SaviyntApiUsagePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"view" | "edit">("view");
+  const [activeTab, setActiveTab] = useState<"view" | "edit" | "test">("view");
+
+  // ── Playground States ───────────────────────────────────────
+  type CredEnv = "DEV" | "PRE" | "PROD";
+  const [credTab, setCredTab] = useState<CredEnv>("DEV");
+  const [creds, setCreds] = useState<Record<CredEnv, { url: string; username: string; password: string }>>({ 
+    DEV:  { url: "", username: "", password: "" },
+    PRE:  { url: "", username: "", password: "" },
+    PROD: { url: "", username: "", password: "" },
+  });
+  const [showPwd, setShowPwd] = useState<Record<CredEnv, boolean>>({ DEV: false, PRE: false, PROD: false });
+  const [testApiLoading, setTestApiLoading] = useState<boolean>(false);
+  const [testApiResponse, setTestApiResponse] = useState<any>(null);
+  const [responseFormat, setResponseFormat] = useState<"json" | "table" | "cards">("json");
+
+  // Load tenant credentials on mount
+  useEffect(() => {
+    const fetchCredentials = async () => {
+      try {
+        const res = await fetch("/api/day0/tenant-credentials");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.credentials) {
+            const c = data.credentials;
+            setCreds({
+              DEV:  { url: c.SAVIYNT_DEV_URL  || "", username: c.SAVIYNT_DEV_USERNAME  || "", password: c.SAVIYNT_DEV_PASSWORD  || "" },
+              PRE:  { url: c.SAVIYNT_PRE_URL  || "", username: c.SAVIYNT_PRE_USERNAME  || "", password: c.SAVIYNT_PRE_PASSWORD  || "" },
+              PROD: { url: c.SAVIYNT_PROD_URL || "", username: c.SAVIYNT_PROD_USERNAME || "", password: c.SAVIYNT_PROD_PASSWORD || "" },
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch credentials on mount in API usage page:", err);
+      }
+    };
+    fetchCredentials();
+  }, []);
+
   const [userRole, setUserRole] = useState<string>("BasicUser");
   const [userName, setUserName] = useState<string>("admin");
 
@@ -138,6 +175,7 @@ export default function SaviyntApiUsagePage() {
     setEditBodyMode(selectedApi.bodyMode);
     setEditBodyRaw(selectedApi.bodyRaw);
     setJsonError(null);
+    setTestApiResponse(null);
   }, [selectedApi]);
 
   // Live validate JSON body in editor
@@ -529,6 +567,246 @@ export default function SaviyntApiUsagePage() {
       </div>
     );
   }
+  const getResourceList = (response: any) => {
+    if (!response) return null;
+    if (Array.isArray(response)) return { type: "Item", data: response };
+    if (response.securitysystems) return { type: "Security System", data: response.securitysystems };
+    if (response.endpoints) return { type: "Endpoint", data: response.endpoints };
+    if (response.roles) return { type: "Role", data: response.roles };
+    if (response.entitlements) return { type: "Entitlement", data: response.entitlements };
+    if (response.securitySystems) return { type: "Security System", data: response.securitySystems };
+    
+    for (const key of Object.keys(response)) {
+      if (Array.isArray(response[key])) {
+        return { type: key.replace(/s$/, "").replace(/([A-Z])/g, " $1"), data: response[key] };
+      }
+    }
+    return null;
+  };
+
+  const renderResponseTable = (response: any) => {
+    const resource = getResourceList(response);
+    if (!resource || !resource.data || resource.data.length === 0) {
+      const entries = Object.entries(response);
+      if (entries.length === 0) {
+        return (
+          <div className="text-[10px] text-slate-400 italic py-3 text-center">
+            No properties to display in table.
+          </div>
+        );
+      }
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[11px] text-slate-300 border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                <th className="py-2 pr-4 pl-2">Property</th>
+                <th className="py-2 pr-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(([key, val]) => (
+                <tr key={key} className="border-b border-slate-900/50 hover:bg-slate-900/30">
+                  <td className="py-2 px-2 font-mono text-pink-400">{key}</td>
+                  <td className="py-2 px-2 font-mono text-slate-200">
+                    {val === null || val === undefined ? (
+                      <span className="text-slate-600">-</span>
+                    ) : typeof val === "object" ? (
+                      <pre className="text-[9.5px] font-mono text-slate-300 bg-slate-950 p-2 rounded border border-slate-900/50 max-h-[100px] overflow-y-auto whitespace-pre-wrap select-text select-all block">
+                        {JSON.stringify(val, null, 2)}
+                      </pre>
+                    ) : (
+                      String(val)
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    const allKeys = Array.from(
+      new Set(resource.data.flatMap((item: any) => Object.keys(item)))
+    ).filter(k => typeof k === "string");
+
+    return (
+      <div className="overflow-x-auto rounded-xl border border-slate-900 bg-slate-950/45">
+        <table className="w-full text-left text-[11px] text-slate-300 border-collapse">
+          <thead>
+            <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+              {allKeys.map(key => (
+                <th key={key} className="py-2 px-3">
+                  {key.replace(/([A-Z])/g, " $1")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {resource.data.map((item: any, idx: number) => (
+              <tr key={idx} className="border-b border-slate-900 hover:bg-slate-900/30 transition-colors">
+                {allKeys.map(key => (
+                  <td 
+                    key={key} 
+                    className="py-2 px-3 font-mono max-w-[200px] truncate text-slate-200" 
+                    title={typeof item[key] === "object" ? JSON.stringify(item[key], null, 2) : String(item[key] ?? "")}
+                  >
+                    {item[key] === null || item[key] === undefined ? (
+                      <span className="text-slate-600">-</span>
+                    ) : typeof item[key] === "object" ? (
+                      <span className="text-pink-400 bg-pink-950/20 px-1 py-0.5 rounded text-[9px] font-bold">
+                        {Array.isArray(item[key]) ? `Array(${item[key].length})` : "Object"}
+                      </span>
+                    ) : (
+                      String(item[key])
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderResponseCards = (response: any) => {
+    const resource = getResourceList(response);
+    if (!resource || !resource.data || resource.data.length === 0) {
+      const entries = Object.entries(response);
+      if (entries.length === 0) {
+        return (
+          <div className="text-[10px] text-slate-400 italic py-3 text-center">
+            No properties to display as cards.
+          </div>
+        );
+      }
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+          {entries.map(([key, val]) => (
+            <div key={key} className="bg-slate-900/40 border border-slate-800/80 p-3 rounded-xl flex flex-col gap-1">
+              <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">{key.replace(/([A-Z])/g, " $1")}</span>
+              <div className="text-xs font-mono text-pink-400 break-words mt-0.5">
+                {val === null || val === undefined ? (
+                  <span className="text-slate-650">-</span>
+                ) : typeof val === "object" ? (
+                  <pre className="text-[9.5px] font-mono text-slate-350 bg-slate-950 p-2 rounded border border-slate-900 max-h-[120px] overflow-y-auto whitespace-pre-wrap select-text select-all block mt-1">
+                    {JSON.stringify(val, null, 2)}
+                  </pre>
+                ) : (
+                  String(val)
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+        {resource.data.map((item: any, idx: number) => {
+          const title = item.name || item.displayName || item.id || `Item ${idx + 1}`;
+          const id = item.id || item.code || "";
+          const desc = item.description || item.descriptionVal || item.entitlement_value || "";
+          const extraProps = Object.entries(item).filter(([k, _]) => k !== "name" && k !== "displayName" && k !== "id" && k !== "code" && k !== "description" && k !== "descriptionVal");
+
+          return (
+            <div key={idx} className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-850 p-4 rounded-xl space-y-2 hover:border-pink-500/30 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-xs font-bold text-slate-100 truncate">{title}</div>
+                  {id && (
+                    <div className="text-[9px] font-mono text-slate-500">ID: {id}</div>
+                  )}
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded tracking-wide shrink-0">
+                  {resource.type}
+                </span>
+              </div>
+              
+              {desc && (
+                <p className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/50 p-2 rounded-lg border border-slate-900/20 italic">
+                  {desc}
+                </p>
+              )}
+
+              {extraProps.length > 0 && (
+                <div className="border-t border-slate-900/60 pt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[9px]">
+                  {extraProps.map(([k, v]) => (
+                    <div key={k} className="flex flex-col truncate">
+                      <span className="text-slate-500 uppercase font-semibold text-[8px] tracking-wider">{k.replace(/([A-Z])/g, " $1")}</span>
+                      {typeof v === "object" ? (
+                        <span 
+                          className="font-mono text-pink-400 truncate cursor-help border-b border-pink-550/20 w-fit"
+                          title={JSON.stringify(v, null, 2)}
+                        >
+                          {Array.isArray(v) ? `Array(${v.length})` : "Object"}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-slate-300 truncate" title={String(v)}>
+                          {String(v)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const handleTestApi = async () => {
+    if (!selectedApi) return;
+    const activeCreds = creds[credTab];
+    if (!activeCreds.url?.trim()) {
+      setTestApiResponse({
+        success: false,
+        error: "Please enter a valid Saviynt Tenant URL in the fields below before testing.",
+        reachable: false
+      });
+      return;
+    }
+    setTestApiLoading(true);
+    setTestApiResponse(null);
+    try {
+      const payload = {
+        env: credTab,
+        url: activeCreds.url,
+        username: activeCreds.username,
+        password: activeCreds.password,
+        apiPath: selectedApi.url,
+        method: selectedApi.method
+      };
+
+      const res = await fetch("/api/day0/tenant-credentials/test-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "API test request failed");
+      }
+
+      const data = await res.json();
+      setTestApiResponse(data);
+      showToast("API call successfully completed!", "success");
+    } catch (err: any) {
+      setTestApiResponse({
+        success: false,
+        error: err.message || "An unexpected error occurred during API testing."
+      });
+      showToast(err.message || "API call failed", "error");
+    } finally {
+      setTestApiLoading(false);
+    }
+  };
 
   return (
     <Day0Shell
@@ -650,17 +928,26 @@ export default function SaviyntApiUsagePage() {
                 </div>
 
                 {/* Tab switch */}
-                {userRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN" ? (
-                  <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800/80">
-                    <button
-                      onClick={() => setActiveTab("view")}
-                      className={`
-                        px-4 py-1.5 text-xs font-semibold rounded-md transition duration-150
-                        ${activeTab === "view" ? "bg-slate-800 text-blue-400" : "text-slate-400 hover:text-slate-200"}
-                      `}
-                    >
-                      View Details
-                    </button>
+                <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800/80">
+                  <button
+                    onClick={() => setActiveTab("view")}
+                    className={`
+                      px-4 py-1.5 text-xs font-semibold rounded-md transition duration-150
+                      ${activeTab === "view" ? "bg-slate-800 text-blue-400" : "text-slate-400 hover:text-slate-200"}
+                    `}
+                  >
+                    View Details
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("test")}
+                    className={`
+                      px-4 py-1.5 text-xs font-semibold rounded-md transition duration-150
+                      ${activeTab === "test" ? "bg-slate-800 text-blue-400" : "text-slate-400 hover:text-slate-200"}
+                    `}
+                  >
+                    Test API
+                  </button>
+                  {userRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN" && (
                     <button
                       onClick={() => setActiveTab("edit")}
                       className={`
@@ -670,12 +957,8 @@ export default function SaviyntApiUsagePage() {
                     >
                       Edit Definition
                     </button>
-                  </div>
-                ) : (
-                  <span className="text-[10px] bg-slate-950 text-slate-400 border border-slate-800 px-2.5 py-1 rounded font-extrabold uppercase select-none flex items-center gap-1">
-                    <span>🛡️</span> Read Only Mode
-                  </span>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* View Tab Body */}
@@ -995,6 +1278,206 @@ export default function SaviyntApiUsagePage() {
                       {saving ? "Overwriting..." : "Save Definition"}
                     </button>
                   </div>
+
+                </div>
+              )}
+
+              {/* Test Tab Body */}
+              {activeTab === "test" && (
+                <div className="p-6 flex-1 overflow-y-auto max-h-[500px] flex flex-col gap-6 scrollbar-thin">
+                  
+                  {/* Environment Tabs */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-pink-400">
+                      Saviynt Environment Workspace
+                    </span>
+                    <div className="flex gap-2 border-b pb-1 border-slate-800">
+                      {(["DEV", "PRE", "PROD"] as CredEnv[]).map(env => {
+                        const filled = !!(creds[env].url && creds[env].username);
+                        return (
+                          <button
+                            key={env}
+                            type="button"
+                            onClick={() => setCredTab(env)}
+                            className={`px-4 py-1.5 rounded-t-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-b-2 flex items-center gap-1.5 ${
+                              credTab === env
+                                ? "border-pink-500 text-pink-400"
+                                : "border-transparent text-slate-500 hover:text-slate-350"
+                            }`}
+                          >
+                            {filled ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block" />
+                            )}
+                            {env}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Credentials Fields */}
+                  <div className="bg-slate-950/40 border border-slate-855 p-4 rounded-xl space-y-4">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          Tenant URL
+                        </label>
+                        <input
+                          type="url"
+                          value={creds[credTab].url}
+                          onChange={e => setCreds(prev => ({ ...prev, [credTab]: { ...prev[credTab], url: e.target.value } }))}
+                          placeholder="https://tenant-name.saviyntcloud.com"
+                          className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-pink-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            Username
+                          </label>
+                          <input
+                            type="text"
+                            value={creds[credTab].username}
+                            onChange={e => setCreds(prev => ({ ...prev, [credTab]: { ...prev[credTab], username: e.target.value } }))}
+                            placeholder="admin"
+                            className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-pink-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            Password
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showPwd[credTab] ? "text" : "password"}
+                              value={creds[credTab].password}
+                              onChange={e => setCreds(prev => ({ ...prev, [credTab]: { ...prev[credTab], password: e.target.value } }))}
+                              placeholder={creds[credTab].password === "••••••••" ? "Already set — type to change" : "Password"}
+                              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 pr-10 text-xs font-mono text-slate-200 focus:outline-none focus:border-pink-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPwd(p => ({ ...p, [credTab]: !p[credTab] }))}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors text-[10px]"
+                            >
+                              {showPwd[credTab] ? "🙈" : "👁️"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Target Endpoint & Execute Row */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Target API Path</span>
+                    <div className="flex items-stretch bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+                      <span className={`px-4 flex items-center font-bold text-xs ${getMethodBadge(selectedApi.method)}`}>
+                        {selectedApi.method}
+                      </span>
+                      <input
+                        type="text"
+                        readOnly
+                        value={selectedApi.url}
+                        className="flex-1 bg-transparent border-none text-xs font-mono px-3 py-2.5 text-sky-400 outline-none select-all"
+                      />
+                      <button
+                        type="button"
+                        disabled={testApiLoading}
+                        onClick={handleTestApi}
+                        className="px-5 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white text-[10px] font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shrink-0 flex items-center justify-center gap-1"
+                      >
+                        {testApiLoading ? "⚡ Requesting..." : "⚡ Execute API Call"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Body Preview */}
+                  {selectedApi.bodyMode !== "none" && selectedApi.bodyRaw && (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                        Request Body Payload ({selectedApi.bodyMode})
+                      </span>
+                      <pre className="p-3.5 rounded-xl bg-slate-950 border border-slate-850 font-mono text-[10.5px] text-sky-355 overflow-x-auto max-h-[140px] scrollbar-thin select-all">
+                        {selectedApi.bodyRaw}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Response Container */}
+                  {testApiResponse && (
+                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3 mt-1 animate-fadeIn">
+                      
+                      {/* Connection header status */}
+                      <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`h-2 w-2 rounded-full ${testApiResponse.reachable ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Connection Status: {testApiResponse.reachable ? "REACHABLE" : "UNREACHABLE"}
+                          </span>
+                        </div>
+                        {testApiResponse.token && (
+                          <span className="bg-pink-950/40 text-pink-400 border border-pink-850 px-2 py-0.5 rounded text-[8.5px] font-bold font-mono uppercase tracking-wider">
+                            Authenticated
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Connection errors if any */}
+                      {testApiResponse.error && (
+                        <div className="text-[10px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2.5 rounded-xl">
+                          ⚠ {testApiResponse.error}
+                        </div>
+                      )}
+
+                      {/* Response Payload and Formatting Viewers */}
+                      {(testApiResponse.apiResponse || testApiResponse.authResponse) && (
+                        <div className="space-y-3">
+                          
+                          {/* Format Selector Row */}
+                          <div className="flex justify-between items-center border-b border-slate-900 pb-2">
+                            <span className="text-[9.5px] uppercase font-bold text-slate-500 tracking-wider">
+                              Response Visualization:
+                            </span>
+                            <div className="flex gap-1.5 bg-slate-900/80 p-1 rounded-lg border border-slate-800">
+                              {(["json", "table", "cards"] as const).map(fmt => (
+                                <button
+                                  key={fmt}
+                                  type="button"
+                                  onClick={() => setResponseFormat(fmt)}
+                                  className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase transition-all duration-200 cursor-pointer ${
+                                    responseFormat === fmt
+                                      ? "bg-pink-600 text-white shadow-sm font-black"
+                                      : "text-slate-400 hover:text-slate-200"
+                                  }`}
+                                >
+                                  {fmt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Render response output */}
+                          <div className="animate-fadeIn">
+                            {responseFormat === "json" ? (
+                              <div className="space-y-1">
+                                <div className="font-mono text-[10.5px] leading-relaxed text-slate-300 bg-slate-950 max-h-[260px] overflow-y-auto p-3.5 rounded-xl border border-slate-900 shadow-inner select-text select-all">
+                                  <pre>{JSON.stringify(testApiResponse.apiResponse || testApiResponse.authResponse, null, 2)}</pre>
+                                </div>
+                              </div>
+                            ) : responseFormat === "table" ? (
+                              renderResponseTable(testApiResponse.apiResponse || testApiResponse.authResponse)
+                            ) : (
+                              renderResponseCards(testApiResponse.apiResponse || testApiResponse.authResponse)
+                            )}
+                          </div>
+
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 </div>
               )}

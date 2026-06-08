@@ -498,7 +498,11 @@ export default function BaselineWorkspacePage() {
  
       // 5. Stage, commit, and push generated baseline configuration directories and files to GitHub in GitOps mode
       try {
-        await fetch("/api/day0/workspace-settings/push", { method: "POST" });
+        const pushRes = await fetch("/api/day0/workspace-settings/push", { method: "POST" });
+        if (!pushRes.ok) {
+          const pushData = await pushRes.json();
+          alert(`⚠️ GitOps Push Warning\n\nBaseline files were created locally, but failed to push to your remote GitHub repository: ${pushData.error || "Unknown error"}\n\nMake sure your Personal Access Token (PAT) is configured with write permissions in the Day 0 setup settings.`);
+        }
       } catch (gitPushErr) {
         console.error("Failed to execute GitOps remote repository push:", gitPushErr);
       }
@@ -544,7 +548,7 @@ export default function BaselineWorkspacePage() {
     <Day0Shell
       title="Baseline Workspaces"
       subtitle="Map boundary dependencies and generate authentic Terraform baseline configurations."
-      backTo="/wizard/day0"
+      backTo="/wizard/explorer"
     >
       <div className="flex flex-col gap-6 max-w-[1400px] mx-auto w-full animate-fadeIn">
         {/* Environment Selector and Manual Navigation Panel */}

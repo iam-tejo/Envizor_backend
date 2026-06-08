@@ -1,0 +1,10 @@
+{
+  "Billing_West_Portal": {
+    "cron": "none",
+    "lastRun": "2026-06-07T19:55:14.069Z"
+  },
+  "Legacy_HR_Directory": {
+    "cron": "*/15 * * * *",
+    "lastRun": "2026-06-08T11:21:34.713Z"
+  }
+}

@@ -4,6 +4,8 @@ import path from "path";
 
 import { getWorkspaceRoot } from "@/app/lib/workspaceConfig";
 
+export const dynamic = "force-dynamic";
+
 // ⭐ Prevent directory traversal
 function resolveSafePath(workspace: string, parts: string[]): string | null {
   const baseDir = path.join(getWorkspaceRoot(), workspace);

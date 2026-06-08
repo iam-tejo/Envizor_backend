@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 
 export default function KnowMorePage() {
-  const [activeTab, setActiveTab] = useState<"mission" | "process" | "no-wizard" | "capabilities" | "terraform" | "faq">("mission");
+  const [activeTab, setActiveTab] = useState<"mission" | "process" | "no-wizard" | "capabilities" | "terraform" | "disconnected-onboarding" | "agent-deployment" | "faq">("mission");
   const [activeTfResource, setActiveTfResource] = useState<string>("security_system");
   const [activeStep, setActiveStep] = useState<number>(1);
   const [activeManualStep, setActiveManualStep] = useState<number>(1);
@@ -22,6 +22,107 @@ export default function KnowMorePage() {
   const [requestedScope, setRequestedScope] = useState<string>("DEV_Admin");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // ── Disconnected API testing states ──
+  const [importConn, setImportConn] = useState<string>("Billing_West_Portal");
+  const [importRes, setImportRes] = useState<any>(null);
+  const [importLoading, setImportLoading] = useState<boolean>(false);
+
+  const [createTaskId, setCreateTaskId] = useState<string>("TASK-1001");
+  const [createConn, setCreateConn] = useState<string>("Billing_West_Portal");
+  const [createOp, setCreateOp] = useState<string>("CREATE_ACCOUNT");
+  const [createAccount, setCreateAccount] = useState<string>("alice@company.com");
+  const [createDetails, setCreateDetails] = useState<string>("Role: Developer");
+  const [createRes, setCreateRes] = useState<any>(null);
+  const [createLoading, setCreateLoading] = useState<boolean>(false);
+
+  const [executeTaskId, setExecuteTaskId] = useState<string>("TASK-1001");
+  const [executeConn, setExecuteConn] = useState<string>("Billing_West_Portal");
+  const [executeRes, setExecuteRes] = useState<any>(null);
+  const [executeLoading, setExecuteLoading] = useState<boolean>(false);
+  const [queryTaskId, setQueryTaskId] = useState<string>("TASK-1001");
+  const [queryRes, setQueryRes] = useState<any>(null);
+  const [queryLoading, setQueryLoading] = useState<boolean>(false);
+
+  // ── Disconnected API testing handlers ──
+  const handleTestImport = async () => {
+    setImportLoading(true);
+    setImportRes(null);
+    try {
+      const res = await fetch("/api/wizard/disconnected/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionName: importConn }),
+      });
+      const data = await res.json();
+      setImportRes(data);
+    } catch (err: any) {
+      setImportRes({ error: err.message });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleTestCreateTask = async () => {
+    setCreateLoading(true);
+    setCreateRes(null);
+    try {
+      const res = await fetch("/api/wizard/disconnected/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          taskId: createTaskId,
+          connectionName: createConn,
+          operation: createOp,
+          accountName: createAccount,
+          details: createDetails
+        }),
+      });
+      const data = await res.json();
+      setCreateRes(data);
+    } catch (err: any) {
+      setCreateRes({ error: err.message });
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleTestExecuteTask = async () => {
+    setExecuteLoading(true);
+    setExecuteRes(null);
+    try {
+      const res = await fetch("/api/wizard/disconnected/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "execute",
+          taskId: executeTaskId,
+          connectionName: executeConn
+        }),
+      });
+      const data = await res.json();
+      setExecuteRes(data);
+    } catch (err: any) {
+      setExecuteRes({ error: err.message });
+    } finally {
+      setExecuteLoading(false);
+    }
+  };
+
+  const handleTestQueryTask = async () => {
+    setQueryLoading(true);
+    setQueryRes(null);
+    try {
+      const res = await fetch(`/api/wizard/disconnected/tasks?taskId=${encodeURIComponent(queryTaskId)}`);
+      const data = await res.json();
+      setQueryRes(data);
+    } catch (err: any) {
+      setQueryRes({ error: err.message });
+    } finally {
+      setQueryLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -506,107 +607,7 @@ Apply complete! Resources: 0 added, 1 changed, 0 destroyed.`
           </div>
         </div>
 
-        {/* Persistent Sticky Ecosystem Mini-Map & Quick-Navigation Header */}
-        <div 
-          className={`sticky top-2 z-[90] backdrop-blur-md border rounded-2xl p-3 flex transition-all duration-300 shadow-lg ${
-            viewMode === "mobile" 
-              ? "flex-col items-stretch gap-2.5" 
-              : "flex-col md:flex-row items-center justify-between gap-4"
-          }`}
-          style={{ 
-            backgroundColor: "var(--bg-surface)", 
-            borderColor: "var(--border)",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.25)"
-          }}
-        >
-          {viewMode !== "mobile" && (
-            <div className="hidden md:flex items-center gap-3">
-              <span className="text-xl">🧭</span>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Ecosystem Navigator</span>
-                <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Envizor Active Pipeline Map</span>
-              </div>
-            </div>
-          )}
 
-          {/* Active Mini-Map Dots & Routers */}
-          <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider overflow-x-auto max-w-full pb-1 md:pb-0 scrollbar-none whitespace-nowrap ${
-            viewMode === "mobile" ? "justify-start px-1" : "justify-center"
-          }`}>
-            <Link 
-              href="/wizard/day0-setup" 
-              onClick={(e) => handleTargetLinkClick(e, "/wizard/day0-setup")}
-              className={`px-2.5 py-1 rounded border transition hover:scale-[1.02] cursor-pointer text-white flex-shrink-0 flex items-center gap-1 ${
-                isTargetLocked("/wizard/day0-setup") ? "opacity-65 border-dashed" : ""
-              }`} 
-              style={{ backgroundColor: "var(--bg-base)", borderColor: "var(--border)", color: "var(--accent)" }}
-            >
-              {isTargetLocked("/wizard/day0-setup") ? "🔒 " : ""}1. Scan 📡
-            </Link>
-            <span className="text-slate-500 flex-shrink-0">➔</span>
-            <Link 
-              href="/wizard/day0/diff" 
-              onClick={(e) => handleTargetLinkClick(e, "/wizard/day0/diff")}
-              className={`px-2.5 py-1 rounded border transition hover:scale-[1.02] cursor-pointer text-white flex-shrink-0 flex items-center gap-1 ${
-                isTargetLocked("/wizard/day0/diff") ? "opacity-65 border-dashed" : ""
-              }`} 
-              style={{ backgroundColor: "var(--bg-base)", borderColor: "var(--border)", color: "var(--warning)" }}
-            >
-              {isTargetLocked("/wizard/day0/diff") ? "🔒 " : ""}2. Reconcile 🔍
-            </Link>
-            <span className="text-slate-500 flex-shrink-0">➔</span>
-            <Link 
-              href="/wizard/pull" 
-              onClick={(e) => handleTargetLinkClick(e, "/wizard/pull")}
-              className={`px-2.5 py-1 rounded border transition hover:scale-[1.02] cursor-pointer text-white flex-shrink-0 flex items-center gap-1 ${
-                isTargetLocked("/wizard/pull") ? "opacity-65 border-dashed" : ""
-              }`} 
-              style={{ backgroundColor: "var(--bg-base)", borderColor: "var(--border)", color: "var(--accent)" }}
-            >
-              {isTargetLocked("/wizard/pull") ? "🔒 " : ""}3. Compile ⚙️
-            </Link>
-            <span className="text-slate-500 flex-shrink-0">➔</span>
-            <Link 
-              href="/wizard/push" 
-              onClick={(e) => handleTargetLinkClick(e, "/wizard/push")}
-              className={`px-2.5 py-1 rounded border transition hover:scale-[1.02] cursor-pointer text-white flex-shrink-0 flex items-center gap-1 ${
-                isTargetLocked("/wizard/push") ? "opacity-65 border-dashed" : ""
-              }`} 
-              style={{ backgroundColor: "var(--bg-base)", borderColor: "var(--border)", color: "var(--success)" }}
-            >
-              {isTargetLocked("/wizard/push") ? "🔒 " : ""}4. Release 🚀
-            </Link>
-          </div>
-
-          {/* Sticky Tab Switcher Shortcut */}
-          <div className="flex items-center gap-1 bg-black/20 p-0.5 rounded-lg border overflow-x-auto max-w-full scrollbar-none whitespace-nowrap" style={{ borderColor: "var(--border)" }}>
-            {[
-              { id: "mission", label: "Mission" },
-              { id: "process", label: "Process" },
-              { id: "no-wizard", label: "VS Manual" },
-              { id: "capabilities", label: "Specs" },
-              { id: "terraform", label: "Terraform" },
-              { id: "faq", label: "FAQs" }
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  setActiveTab(t.id as any);
-                  setActiveStep(1);
-                  setActiveManualStep(1);
-                }}
-                className="px-2 py-0.5 rounded text-[9.5px] font-bold uppercase transition-all duration-200 cursor-pointer whitespace-nowrap flex-shrink-0"
-                style={
-                  activeTab === t.id
-                    ? { backgroundColor: "var(--accent)", color: "#ffffff" }
-                    : { color: "var(--text-secondary)" }
-                }
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Hero title block */}
         <div className="text-center max-w-3xl mx-auto flex flex-col items-center gap-3">
@@ -715,6 +716,38 @@ Apply complete! Resources: 0 added, 1 changed, 0 destroyed.`
             }
           >
             🔧 Terraform
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("disconnected-onboarding");
+              setActiveStep(1);
+            }}
+            className={`py-1 px-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer ${
+              viewMode === "mobile" ? "whitespace-nowrap flex-shrink-0" : "flex-1"
+            }`}
+            style={
+              activeTab === "disconnected-onboarding"
+                ? { background: "linear-gradient(135deg, #ea580c, #c2410c)", color: "#ffffff" }
+                : { color: "var(--text-secondary)" }
+            }
+          >
+            🔌 Disconnected Onboarding
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("agent-deployment");
+              setActiveStep(1);
+            }}
+            className={`py-1 px-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer ${
+              viewMode === "mobile" ? "whitespace-nowrap flex-shrink-0" : "flex-1"
+            }`}
+            style={
+              activeTab === "agent-deployment"
+                ? { background: "linear-gradient(135deg, #ec4899, #d946ef)", color: "#ffffff" }
+                : { color: "var(--text-secondary)" }
+            }
+          >
+            🤖 Agent Deployment
           </button>
           <button
             onClick={() => {
@@ -3156,6 +3189,34 @@ Error: Resource creation failed
               </div>
               <span className="text-[10px] font-black uppercase tracking-wider font-mono" style={{ color: "var(--accent)" }}>Schema Customization</span>
             </div>
+
+            <div 
+              className="rounded-2xl border p-6 space-y-4 flex flex-col justify-between transition-colors duration-300"
+              style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border)" }}
+            >
+              <div className="space-y-2">
+                <span className="text-2xl">🔌</span>
+                <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Disconnected App Onboarding</h3>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  Brings legacy, air-gapped, or API-less applications under IGA governance. Securely vaults credentials and supports both scheduled runs and dynamic, API-triggered import and task execution endpoints backed by a local JSON database.
+                </p>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider font-mono" style={{ color: "#f97316" }}>API-Triggered Agent Sync</span>
+            </div>
+
+            <div 
+              className="rounded-2xl border p-6 space-y-4 flex flex-col justify-between transition-colors duration-300"
+              style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border)" }}
+            >
+              <div className="space-y-2">
+                <span className="text-2xl">📋</span>
+                <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Agentic Audit Trail</h3>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  Logs every agent scan, file upload, and provisioning task. Utilizes a local JSON database manager that automatically archives completed tasks (&gt;100) and audit runs (&gt;50) to timestamped compliance archives.
+                </p>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider font-mono" style={{ color: "var(--accent)" }}>Persistent Database & Archiving</span>
+            </div>
           </div>
         )}
 
@@ -3575,6 +3636,746 @@ resource "saviynt_import_transport_package_resource" "billing_module_import" {
             </div>
           );
         })()}
+
+        {/* TAB: DISCONNECTED APPLICATION ONBOARDING */}
+        {activeTab === "disconnected-onboarding" && (
+          <div className="space-y-10 animate-fadeIn">
+
+            {/* Hero Banner */}
+            <div
+              className="relative overflow-hidden rounded-3xl border p-8 md:p-12 flex flex-col md:flex-row items-center gap-8"
+              style={{
+                background: "linear-gradient(135deg, rgba(234,88,12,0.08), rgba(194,65,12,0.04), rgba(0,0,0,0))",
+                borderColor: "rgba(234,88,12,0.25)"
+              }}
+            >
+              <div
+                className="absolute inset-0 pointer-events-none opacity-20"
+                style={{ background: "radial-gradient(circle at 10% 50%, rgba(234,88,12,0.3) 0%, transparent 60%)" }}
+              />
+              <div className="relative z-10 flex-1 space-y-4">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-xl"
+                    style={{ background: "linear-gradient(135deg, #ea580c, #c2410c)", boxShadow: "0 8px 32px rgba(234,88,12,0.4)" }}
+                  >🔌</span>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#f97316" }}>New Feature</span>
+                    <h2 className="text-2xl font-black" style={{ color: "var(--text-primary)" }}>Disconnected Application Onboarding</h2>
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed max-w-2xl" style={{ color: "var(--text-secondary)" }}>
+                  Not every application in your enterprise can be connected to Saviynt via a live API. Legacy mainframe systems, on-premises HR databases, and COTS applications behind firewalls often exist outside of direct IGA reach — creating dangerous <strong style={{ color: "#f97316" }}>identity governance blind spots</strong>.
+                </p>
+                <p className="text-sm leading-relaxed max-w-2xl" style={{ color: "var(--text-secondary)" }}>
+                  Envizor's Disconnected Application Onboarding module closes this gap with an autonomous background agent that securely vaults credentials, periodically pulls identity data on a per-application schedule, and reconciles it against your Saviynt IGA platform — fully automatically.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  {["AES-256 Credential Vaulting", "Per-App Cron Scheduler", "Autonomous Background Agent", "Saviynt Provisioning Reconciliation"].map(badge => (
+                    <span
+                      key={badge}
+                      className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                      style={{ borderColor: "rgba(234,88,12,0.4)", color: "#f97316", backgroundColor: "rgba(234,88,12,0.07)" }}
+                    >{badge}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="relative z-10 flex-shrink-0 flex flex-col items-center gap-3">
+                <div className="w-32 h-32 rounded-3xl border flex items-center justify-center"
+                  style={{ borderColor: "rgba(234,88,12,0.3)", background: "rgba(234,88,12,0.06)" }}>
+                  <span className="text-6xl">🤖</span>
+                </div>
+                <span className="text-[10px] font-bold text-orange-400 text-center">Autonomous Sync Agent</span>
+              </div>
+            </div>
+
+            {/* ─── FULL END-TO-END FLOW DIAGRAM ─── */}
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#f97316" }}>End-to-End Autonomous Flow</span>
+                <h3 className="text-2xl font-black" style={{ color: "var(--text-primary)" }}>How It All Works — 11 Steps</h3>
+                <p className="text-xs max-w-2xl mx-auto" style={{ color: "var(--text-secondary)" }}>
+                  From registering an app all the way to Saviynt being fully synced and changes in the app reflected back — fully autonomous, on a 15-minute cycle.
+                </p>
+              </div>
+
+              {/* Visual Step Pipeline & Explanation */}
+              <div className="space-y-8">
+                {/* 3D Infographic Image */}
+                <div 
+                  className="rounded-3xl border overflow-hidden p-6 flex flex-col items-center shadow-2xl transition-all duration-300" 
+                  style={{ 
+                    background: "linear-gradient(135deg, #283345 0%, #182130 50%, #101825 100%)", 
+                    borderColor: "rgba(234, 88, 12, 0.2)",
+                    boxShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.7), 0 0 20px 0 rgba(234, 88, 12, 0.03)"
+                  }}
+                >
+                  <img
+                    src="/disconnected_onboarding_process_flow.png"
+                    alt="Disconnected Onboarding 11-Step Process Flowchart"
+                    className="w-full max-w-4xl object-contain rounded-2xl"
+                  />
+                </div>
+
+                {/* 3-Column Phase Breakdown */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Phase 1 */}
+                  <div className="space-y-5 p-6 rounded-2xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "rgba(234,88,12,0.2)" }}>
+                    <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                      <span className="text-xl">⚙️</span>
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Steps 1 - 3</span>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-orange-400">Phase 1: Setup & Discovery</h4>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-[10px] font-bold text-orange-400">1</span>
+                          <strong className="text-xs text-slate-200">Register App & Import API</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          Define the app connection properties (URL, vaulted credentials) and schedule settings, or call the dynamic on-demand import API to trigger onboarding scrapes instantly.
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-[10px] font-bold text-orange-400">2</span>
+                          <strong className="text-xs text-slate-200">Auto-Onboard in Saviynt</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          Envizor dynamically provisions the application profile in Saviynt, generating security systems, endpoints, and import profiles without manual administrative overhead.
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-[10px] font-bold text-orange-400">3</span>
+                          <strong className="text-xs text-slate-200">Extract Identity Data</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          The browser scraping agent logs into target systems using vaulted credentials, extracts users, roles, and access parameters, and normalizes it to import CSV files.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase 2 */}
+                  <div className="space-y-5 p-6 rounded-2xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "rgba(6,182,212,0.2)" }}>
+                    <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                      <span className="text-xl">🛡️</span>
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Steps 4 - 6</span>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-cyan-400">Phase 2: Governance & Decision</h4>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[10px] font-bold text-cyan-400">4</span>
+                          <strong className="text-xs text-slate-200">Upload CSV to Saviynt</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          The agent uploads normalized identity CSVs to Saviynt using file transfer APIs to trigger administrative ingestion and sync.
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[10px] font-bold text-cyan-400">5</span>
+                          <strong className="text-xs text-slate-200">Saviynt Active Governance</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          Saviynt ingests the data, bringing the legacy application under active enterprise identity governance, compliance rules, and active certifications.
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-[10px] font-bold text-cyan-400">6</span>
+                          <strong className="text-xs text-slate-200">Requests & Decisions</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          Access reviews, self-service access requests, SOD policies, or lifecycle processes (mover, leaver, joiner) inside Saviynt produce approved access change decisions.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase 3 */}
+                  <div className="space-y-5 p-6 rounded-2xl border" style={{ backgroundColor: "var(--bg-surface)", borderColor: "rgba(139,92,246,0.2)" }}>
+                    <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                      <span className="text-xl">⚡</span>
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Steps 7 - 11</span>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-violet-400">Phase 3: Execution & Sync Complete</h4>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-[10px] font-bold text-violet-400">7</span>
+                          <strong className="text-xs text-slate-200">Push Tasks to Queue</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          Approved changes are pushed to Envizor's Tasks API to register pending provisioning tickets in the queue (`disconnected_tasks.json`).
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-[10px] font-bold text-violet-400">8 & 9</span>
+                          <strong className="text-xs text-slate-200">Trigger Agent & Emulate Write Ops</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          Calling Envizor's execute API invokes the browser emulator to log in to target systems and perform write actions (e.g. creating or deactivating accounts) automatically.
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-5 h-5 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-[10px] font-bold text-violet-400">10 & 11</span>
+                          <strong className="text-xs text-slate-200">Verification Scan & Sync Complete</strong>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-400 pl-7">
+                          A post-operation extraction scan pulls the latest state to verify changes. The delta CSV is uploaded to Saviynt, completing the cycle and resolving the ticket.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Architecture Summary */}
+            <div
+              className="rounded-2xl border p-6 md:p-8 space-y-6"
+              style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border)" }}
+            >
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#f97316" }}>Architecture</span>
+                <h3 className="text-lg font-black" style={{ color: "var(--text-primary)" }}>How the Autonomous Agent Works Under the Hood</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Browser Vault", icon: "🔐", desc: "Credentials vaulted in browser storage via AES-256 encryption. Zero-trust security.", color: "#f97316" },
+                  { label: "API-Triggered", icon: "⚡", desc: "Exposes HTTP endpoints (/import, /tasks) for Saviynt and other systems to trigger actions dynamically.", color: "#8b5cf6" },
+                  { label: "Persistent JSON", icon: "💾", desc: "Active tasks queue and run logs are stored in a persistent local JSON database, keeping state across reloads.", color: "#06b6d4" },
+                  { label: "Auto-Archiving", icon: "📦", desc: "Automatically rotates completed tasks (>100) and execution logs (>50 runs) to timestamped archive folders.", color: "#10b981" }
+                ].map((item, i) => (
+                  <div key={item.label} className="relative flex flex-col items-center text-center gap-3">
+                    {i < 3 && (
+                      <div
+                        className="hidden md:block absolute top-6 right-0 translate-x-1/2 z-10 text-xs font-bold"
+                        style={{ color: "var(--text-muted)" }}
+                      >&rarr;</div>
+                    )}
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg"
+                      style={{ background: `${item.color}15`, border: `1.5px solid ${item.color}40` }}
+                    >{item.icon}</div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: item.color }}>{item.label}</div>
+                      <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Interactive API Testing Console */}
+            <div
+              className="rounded-2xl border p-6 md:p-8 space-y-6 animate-fadeIn"
+              style={{ backgroundColor: "var(--bg-surface)", borderColor: "rgba(234,88,12,0.3)" }}
+            >
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#ea580c" }}>Developer Playground</span>
+                <h3 className="text-lg font-black" style={{ color: "var(--text-primary)" }}>🔌 Live API Testing Console</h3>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  Test the new external integration endpoints in real time. Executions will modify the local JSON database, trigger the Saviynt client emulator, and populate active tasks/audit logs!
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* 1. IMPORT API */}
+                <div className="p-5 rounded-xl border space-y-4" style={{ background: "rgba(234,88,12,0.02)", borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                    <span className="text-base">📥</span>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-orange-400">Trigger App Import</h4>
+                      <code className="text-[10px] font-mono text-slate-400">POST /api/wizard/disconnected/import</code>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-400">Connection / Application Name</label>
+                    <input
+                      type="text"
+                      value={importConn}
+                      onChange={(e) => setImportConn(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                      style={{ borderColor: "var(--border)" }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleTestImport}
+                    disabled={importLoading}
+                    className="w-full py-2 rounded-lg font-black uppercase tracking-wider text-xs text-white bg-orange-600 hover:bg-orange-500 disabled:bg-orange-800 transition-colors duration-200 cursor-pointer"
+                  >
+                    {importLoading ? "Executing Scrape..." : "Trigger Import Scrape"}
+                  </button>
+                  {importRes && (
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black uppercase text-slate-500">Response</span>
+                      <pre className="text-[10px] font-mono rounded-lg p-3 overflow-x-auto max-h-40" style={{ background: "#0a0a12", color: "#34d399", border: "1px solid rgba(234,88,12,0.15)" }}>
+                        <code>{JSON.stringify(importRes, null, 2)}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. REGISTER TASK (TICKET) API */}
+                <div className="p-5 rounded-xl border space-y-4" style={{ background: "rgba(139,92,246,0.02)", borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                    <span className="text-base">🎫</span>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-black uppercase tracking-wider" style={{ color: "#a78bfa" }}>Register Provisioning Ticket</h4>
+                      <code className="text-[10px] font-mono text-slate-400">POST /api/wizard/disconnected/tasks (create)</code>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400">Task ID</label>
+                      <input
+                        type="text"
+                        value={createTaskId}
+                        onChange={(e) => setCreateTaskId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                        style={{ borderColor: "var(--border)" }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400">Connection Name</label>
+                      <input
+                        type="text"
+                        value={createConn}
+                        onChange={(e) => setCreateConn(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                        style={{ borderColor: "var(--border)" }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400">Operation</label>
+                      <select
+                        value={createOp}
+                        onChange={(e) => setCreateOp(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                        style={{ borderColor: "var(--border)" }}
+                      >
+                        <option value="CREATE_ACCOUNT">CREATE_ACCOUNT</option>
+                        <option value="ADD_ACCESS">ADD_ACCESS</option>
+                        <option value="DISABLE_ACCOUNT">DISABLE_ACCOUNT</option>
+                        <option value="REMOVE_ACCESS">REMOVE_ACCESS</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-400">Account Name</label>
+                      <input
+                        type="text"
+                        value={createAccount}
+                        onChange={(e) => setCreateAccount(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                        style={{ borderColor: "var(--border)" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-400">Details</label>
+                    <input
+                      type="text"
+                      value={createDetails}
+                      onChange={(e) => setCreateDetails(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border text-xs bg-slate-950 text-slate-200"
+                      style={{ borderColor: "var(--border)" }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleTestCreateTask}
+                    disabled={createLoading}
+                    className="w-full py-2 rounded-lg font-black uppercase tracking-wider text-xs text-white bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 transition-colors duration-200 cursor-pointer"
+                  >
+                    {createLoading ? "Registering..." : "Register Ticket"}
+                  </button>
+                  {createRes && (
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black uppercase text-slate-500">Response</span>
+                      <pre className="text-[10px] font-mono rounded-lg p-3 overflow-x-auto max-h-40" style={{ background: "#0a0a12", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.15)" }}>
+                        <code>{JSON.stringify(createRes, null, 2)}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. EXECUTE TASK API */}
+                <div className="p-5 rounded-xl border space-y-4" style={{ background: "rgba(6,182,212,0.02)", borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                    <span className="text-base">⚡</span>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-cyan-400">Execute Provisioning Task</h4>
+                      <code className="text-[10px] font-mono text-slate-400">POST /api/wizard/disconnected/tasks (execute)</code>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-400">Task ID to Run</label>
+                      <input
+                        type="text"
+                        value={executeTaskId}
+                        onChange={(e) => setExecuteTaskId(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                        style={{ borderColor: "var(--border)" }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-400">Connection Name</label>
+                      <input
+                        type="text"
+                        value={executeConn}
+                        onChange={(e) => setExecuteConn(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                        style={{ borderColor: "var(--border)" }}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleTestExecuteTask}
+                    disabled={executeLoading}
+                    className="w-full py-2 rounded-lg font-black uppercase tracking-wider text-xs text-white bg-cyan-600 hover:bg-cyan-500 disabled:bg-cyan-800 transition-colors duration-200 cursor-pointer"
+                  >
+                    {executeLoading ? "Executing Task..." : "Execute Task on Legacy App"}
+                  </button>
+                  {executeRes && (
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black uppercase text-slate-500">Response & Logs</span>
+                      <pre className="text-[10px] font-mono rounded-lg p-3 overflow-x-auto max-h-40" style={{ background: "#0a0a12", color: "#06b6d4", border: "1px solid rgba(6,182,212,0.15)" }}>
+                        <code>{JSON.stringify(executeRes, null, 2)}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. QUERY TASK API */}
+                <div className="p-5 rounded-xl border space-y-4" style={{ background: "rgba(16,185,129,0.02)", borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+                    <span className="text-base">🔍</span>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400">Query Task Status</h4>
+                      <code className="text-[10px] font-mono text-slate-400">GET /api/wizard/disconnected/tasks?taskId=...</code>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-400">Task ID to Query</label>
+                    <input
+                      type="text"
+                      value={queryTaskId}
+                      onChange={(e) => setQueryTaskId(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-950 text-slate-200"
+                      style={{ borderColor: "var(--border)" }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleTestQueryTask}
+                    disabled={queryLoading}
+                    className="w-full py-2 rounded-lg font-black uppercase tracking-wider text-xs text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 transition-colors duration-200 cursor-pointer"
+                  >
+                    {queryLoading ? "Querying..." : "Check Task Status"}
+                  </button>
+                  {queryRes && (
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black uppercase text-slate-500">Response</span>
+                      <pre className="text-[10px] font-mono rounded-lg p-3 overflow-x-auto max-h-40" style={{ background: "#0a0a12", color: "#10b981", border: "1px solid rgba(16,185,129,0.15)" }}>
+                        <code>{JSON.stringify(queryRes, null, 2)}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => window.location.href = "/wizard/disconnected-onboarding"}
+                className="px-8 py-3 rounded-xl font-black uppercase tracking-wider text-sm text-white shadow-2xl transition-all duration-300 hover:scale-[1.04] active:scale-95 cursor-pointer border"
+                style={{
+                  background: "linear-gradient(135deg, #ea580c, #c2410c)",
+                  borderColor: "rgba(234,88,12,0.4)",
+                  boxShadow: "0 8px 32px rgba(234,88,12,0.35)"
+                }}
+              >
+                🔌 Open Disconnected Onboarding Console →
+              </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB: AGENT DEPLOYMENT PIPELINE */}
+        {activeTab === "agent-deployment" && (
+          <div className="space-y-10 animate-fadeIn">
+
+            {/* Hero Banner with Cyberpunk Gradient & Flashy Image */}
+            <div
+              className="relative overflow-hidden rounded-3xl border p-8 md:p-12 flex flex-col md:flex-row items-center gap-10"
+              style={{
+                background: "linear-gradient(135deg, rgba(236,72,153,0.08), rgba(217,70,239,0.04), rgba(0,0,0,0))",
+                borderColor: "rgba(236,72,153,0.25)"
+              }}
+            >
+              <div
+                className="absolute inset-0 pointer-events-none opacity-20"
+                style={{ background: "radial-gradient(circle at 10% 50%, rgba(236,72,153,0.3) 0%, transparent 60%)" }}
+              />
+              <div className="relative z-10 flex-1 space-y-4">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-xl"
+                    style={{ background: "linear-gradient(135deg, #ec4899, #d946ef)", boxShadow: "0 8px 32px rgba(236,72,153,0.4)" }}
+                  >🤖</span>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-pink-400">Continuous Delivery</span>
+                    <h2 className="text-2xl font-black text-slate-100">Deploy through Agent (GitOps Pipeline)</h2>
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed max-w-2xl text-slate-300">
+                  Managing environments like DEV, PRE, and PROD separately can result in manual setup mismatches. Envizor solves this by providing a fully autonomous, scheduled GitOps deployment pipeline that translates cloud models directly to Git code, runs validation plans, and gates modifications behind an **Ops Team Approval Console**.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  {["HCL Harvesting", "Timestamped Branching", "Terraform Init/Plan/Apply", "Ops Approval Gate", "Safety Destroy Rollback"].map(badge => (
+                    <span
+                      key={badge}
+                      className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                      style={{ borderColor: "rgba(236,72,153,0.4)", color: "#f472b6", backgroundColor: "rgba(236,72,153,0.07)" }}
+                    >{badge}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="relative z-10 flex-shrink-0 flex flex-col items-center gap-3">
+                <div className="relative group overflow-hidden rounded-3xl border-2 border-pink-500/30 bg-slate-950 p-2 shadow-2xl transition-all duration-500 hover:border-pink-500/60 max-w-[260px]">
+                  <img
+                    src="/agent_deploy_flow.png"
+                    alt="Agent Deployment Flow"
+                    className="w-full rounded-2xl object-cover aspect-square transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-60 pointer-events-none" />
+                </div>
+                <span className="text-[10px] font-bold text-pink-400 text-center tracking-wider uppercase">Pipeline Orchestrator Graphic</span>
+              </div>
+            </div>
+
+            {/* ─── AGENT DEPLOYMENT PIPELINE STEPS ─── */}
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-pink-400">Step-by-Step CI/CD Execution</span>
+                <h3 className="text-2xl font-black text-slate-100">The 7-Step Deployment Lifecycle</h3>
+                <p className="text-xs max-w-2xl mx-auto text-slate-400">
+                  How the Agent safely processes environments, updates Git repositories, plans changes, and awaits human verification before going live.
+                </p>
+              </div>
+
+              {/* 3D Infographic Image */}
+              <div 
+                className="rounded-3xl border overflow-hidden p-6 flex flex-col items-center shadow-2xl transition-all duration-300" 
+                style={{ 
+                  background: "linear-gradient(135deg, #172234 0%, #141f33 50%, #0e1422 100%)", 
+                  borderColor: "rgba(236, 72, 153, 0.2)",
+                  boxShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.7), 0 0 20px 0 rgba(236, 72, 153, 0.03)"
+                }}
+              >
+                <img
+                  src="/agent_deployment_process_flow.png"
+                  alt="Agent Deployment 7-Step Lifecycle Flowchart"
+                  className="w-full max-w-4xl object-contain rounded-2xl"
+                />
+              </div>
+
+              {/* Visual Step Pipeline */}
+              <div className="relative">
+                {/* Vertical connector line (desktop) */}
+                <div className="hidden lg:block absolute left-[39px] top-10 bottom-10 w-[2px] z-0"
+                  style={{ background: "linear-gradient(to bottom, #ec4899, #d946ef, #a855f7, #6366f1, #3b82f6, #10b981, #ef4444)" }}
+                />
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      step: 1,
+                      icon: "🚀",
+                      color: "#ec4899",
+                      label: "Terraform Initialization (init)",
+                      who: "AI Agent",
+                      whoColor: "#ec4899",
+                      desc: "The agent spins up a secure isolated workspace container and runs 'terraform init' on each tenant's configuration directory, downloading required cloud providers and preparing the backend state files.",
+                      tags: ["terraform init", "Sandbox Prepare", "Remote State Backend"]
+                    },
+                    {
+                      step: 2,
+                      icon: "🌾",
+                      color: "#d946ef",
+                      label: "Retrieve Content to HCL Blocks",
+                      who: "AI Agent",
+                      whoColor: "#d946ef",
+                      desc: "The agent crawls and retrieves all active tenant resources from IGA, parsing security settings, database connectors, and application configurations directly into structured HashiCorp Configuration Language (.tf) files.",
+                      tags: ["HCL Synthesis", "Metadata Harvesting", "laC Blueprinting"]
+                    },
+                    {
+                      step: 3,
+                      icon: "🌿",
+                      color: "#a855f7",
+                      label: "Upload Workspace in a New Git Branch",
+                      who: "AI Agent",
+                      whoColor: "#a855f7",
+                      desc: "All compiled Terraform resources are committed to a freshly spawned Git branch. The branch name is tagged with a precise execution timestamp (e.g. deploy-agent-1780799497) and uploaded to the repository.",
+                      tags: ["Git Push", "Timestamp Branch", "Audit History"]
+                    },
+                    {
+                      step: 4,
+                      icon: "🔍",
+                      color: "#6366f1",
+                      label: "Dry-Run Terraform Plan on PRE/PROD",
+                      who: "AI Agent",
+                      whoColor: "#6366f1",
+                      desc: "The agent runs 'terraform plan' against target PRE and PROD cloud configurations, comparing the new Git code against active cloud state to calculate exactly what will be added, changed, or destroyed.",
+                      tags: ["terraform plan", "Drift Delta Map", "Target: PRE/PROD"]
+                    },
+                    {
+                      step: 5,
+                      icon: "🛡️",
+                      color: "#3b82f6",
+                      label: "Ops Team Approval Gate (PAUSE)",
+                      who: "Ops Team",
+                      whoColor: "#3b82f6",
+                      desc: "The pipeline automatically pauses. The plan dry-run output is displayed on the Ops Team Plan Inspector console. Execution halts until manual validation is submitted.",
+                      tags: ["Manual Gate", "Plan Inspector", "Zero-Trust Verification"]
+                    },
+                    {
+                      step: 6,
+                      icon: "✓",
+                      color: "#10b981",
+                      label: "Ops Approves: Terraform Apply to PRE/PROD",
+                      who: "AI Agent",
+                      whoColor: "#10b981",
+                      desc: "If the Ops team clicks 'Approve & Apply', the agent immediately resumes the deployment run, running 'terraform apply' to write variables, roles, and endpoints live to PRE/PROD cloud instances.",
+                      tags: ["terraform apply", "Production Release", "Synchronized State"]
+                    },
+                    {
+                      step: 7,
+                      icon: "✕",
+                      color: "#ef4444",
+                      label: "Ops Rejects: Safety Destroy & Revert",
+                      who: "AI Agent",
+                      whoColor: "#ef4444",
+                      desc: "If the Ops team rejects the plan ('Reject & Destroy'), the agent instantly executes a rollback/destroy routine to safely tear down the staging configurations and restore the original state.",
+                      tags: ["Safety Rollback", "State Guard", "Auto-Clean"]
+                    }
+                  ].map((s) => (
+                    <div key={s.step} className="relative flex gap-4 items-start">
+                      {/* Step Number Circle */}
+                      <div className="relative z-10 flex-shrink-0 w-20 flex flex-col items-center gap-1">
+                        <div
+                          className="w-[52px] h-[52px] rounded-2xl flex items-center justify-center text-xl font-black shadow-lg border-2 transition-all duration-300"
+                          style={{
+                            background: `${s.color}18`,
+                            borderColor: `${s.color}60`,
+                            boxShadow: `0 0 16px ${s.color}22`
+                          }}
+                        >
+                          {s.icon}
+                        </div>
+                        <div className="text-[9px] font-black tracking-widest uppercase" style={{ color: s.color }}>Step {s.step}</div>
+                      </div>
+
+                      {/* Content Card */}
+                      <div
+                        className="flex-1 rounded-2xl border p-4 space-y-2 transition-all duration-300 hover:scale-[1.005]"
+                        style={{
+                          backgroundColor: `${s.color}06`,
+                          borderColor: `${s.color}25`
+                        }}
+                      >
+                        <div className="flex flex-wrap items-center gap-3 justify-between">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-black text-slate-100">{s.label}</h4>
+                            <span
+                              className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                              style={{ borderColor: `${s.whoColor}40`, color: s.whoColor, backgroundColor: `${s.whoColor}10` }}
+                            >{s.who}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {s.tags.map(t => (
+                              <span
+                                key={t}
+                                        className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                                        style={{ borderColor: `${s.color}30`, color: `${s.color}cc`, backgroundColor: `${s.color}08` }}
+                                      >{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[11.5px] leading-relaxed text-slate-300">{s.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Queue Split Clarification Section */}
+            <div
+              className="rounded-2xl border p-6 md:p-8 space-y-6"
+              style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border)" }}
+            >
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-pink-400">Closed-Loop Auditing</span>
+                <h3 className="text-lg font-black text-slate-100">Saviynt Queue Separation Design</h3>
+                <p className="text-xs text-slate-400 leading-normal">
+                  To achieve regulatory compliance and clean operations interfaces, Envizor divides the provisioning lifecycle into two distinct modules:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                <div className="border border-amber-500/20 bg-amber-950/5 p-5 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <span>⚡</span> 1. Saviynt Provision Operations Queue
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Designed to show **Pending Actions Only** (`status === 'PENDING'`). This table serves as a real-time mailbox of out-of-band updates generated inside Saviynt's analytics engine waiting for the agent to pull and reconcile on schedule.
+                  </p>
+                </div>
+
+                <div className="border border-emerald-500/20 bg-emerald-950/5 p-5 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                    <span>✓</span> 2. Agent Actions on Target Systems
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Designed to show **Completed Actions &amp; Logs** (`status === 'COMPLETED'`). Renders all historically resolved operations, allowing administrators to expand any action to view the detailed agent stdout browser simulation logs.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => window.location.href = "/wizard/deploy-agent"}
+                className="px-8 py-3 rounded-xl font-black uppercase tracking-wider text-sm text-white shadow-2xl transition-all duration-300 hover:scale-[1.04] active:scale-95 cursor-pointer border"
+                style={{
+                  background: "linear-gradient(135deg, #ec4899, #d946ef)",
+                  borderColor: "rgba(236,72,153,0.4)",
+                  boxShadow: "0 8px 32px rgba(236,72,153,0.35)"
+                }}
+              >
+                🤖 Launch Deployment Agent Dashboard →
+              </button>
+            </div>
+
+          </div>
+        )}
 
         {/* TAB 4: FREQUENTLY ASKED QUESTIONS */}
         {activeTab === "faq" && (

@@ -2,18 +2,29 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { ensureFolderStructure } from "@/app/lib/terraform/workspace";
+import { isGitAvailable, syncRepoViaApi } from "@/app/lib/workspaceConfig";
 
 // Path to the workspace_settings.json inside app/lib/saviynt/
-const filePath = path.join(process.cwd(), "app/lib/saviynt/workspace_settings.json");
+const isCloud = !!(process.env.VERCEL || process.env.LAMBDA_TASK_ROOT || process.env.AWS_EXECUTION_ENV);
+const filePath = isCloud
+  ? "/tmp/workspace_settings.json"
+  : path.join(process.cwd(), "app/lib/saviynt/workspace_settings.json");
 
 export async function GET() {
   try {
     if (!fs.existsSync(filePath)) {
+      if (isCloud) {
+        const bundledPath = path.join(process.cwd(), "app/lib/saviynt/workspace_settings.json");
+        if (fs.existsSync(bundledPath)) {
+          const fileContent = fs.readFileSync(bundledPath, "utf-8");
+          return NextResponse.json(JSON.parse(fileContent));
+        }
+      }
       return NextResponse.json({
         locationType: "local",
         localPath: "/Users/tejov/Documents/IGA-Saviynt",
-        remoteUrl: "",
-        remoteRepoName: "",
+        remoteUrl: "https://github.com/iam-tejo/IGAWorkspaceAutomationHub",
+        remoteRepoName: "main",
         remoteToken: ""
       });
     }
@@ -44,7 +55,10 @@ export async function POST(req: Request) {
     if (locationType === "remote" && remoteUrl) {
       try {
         const { execSync } = require("child_process");
-        const tempDir = path.join(process.cwd(), "terraform-workspaces-remote");
+        const projectRoot = isCloud ? "" : (process.cwd().endsWith("frontend") ? path.dirname(process.cwd()) : process.cwd());
+        const tempDir = isCloud
+          ? "/tmp/terraform-workspaces-remote"
+          : path.join(projectRoot, "terraform-workspaces-remote");
         const gitPath = path.join(tempDir, ".git");
 
         let originMatches = false;
@@ -59,21 +73,39 @@ export async function POST(req: Request) {
           gitUrl = `https://${remoteToken.trim()}@${cleanUrl}`;
         }
 
-        if (fs.existsSync(gitPath)) {
-          try {
-            const currentOrigin = execSync(`git config --get remote.origin.url`, {
-              cwd: tempDir,
-              encoding: "utf-8"
-            }).trim();
+        const metaPath = path.join(tempDir, ".envizor_git_meta.json");
 
-            const cleanCurrent = currentOrigin.replace(/https:\/\/.*@/, "https://").replace(/\.git$/, "").replace(/\/$/, "");
-            const cleanTarget = gitUrl.replace(/https:\/\/.*@/, "https://").replace(/\.git$/, "").replace(/\/$/, "");
+        if (isGitAvailable()) {
+          if (fs.existsSync(gitPath)) {
+            try {
+              const currentOrigin = execSync(`git config --get remote.origin.url`, {
+                cwd: tempDir,
+                encoding: "utf-8"
+              }).trim();
 
-            if (cleanCurrent === cleanTarget) {
-              originMatches = true;
+              const cleanCurrent = currentOrigin.replace(/https:\/\/.*@/, "https://").replace(/\.git$/, "").replace(/\/$/, "");
+              const cleanTarget = gitUrl.replace(/https:\/\/.*@/, "https://").replace(/\.git$/, "").replace(/\/$/, "");
+
+              if (cleanCurrent === cleanTarget) {
+                originMatches = true;
+              }
+            } catch (originErr) {
+              console.warn("Could not retrieve current Git origin:", originErr);
             }
-          } catch (originErr) {
-            console.warn("Could not retrieve current Git origin:", originErr);
+          }
+        } else {
+          if (fs.existsSync(metaPath)) {
+            try {
+              const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+              const cleanCurrent = meta.url.replace(/https:\/\/.*@/, "https://").replace(/\.git$/, "").replace(/\/$/, "");
+              const cleanTarget = gitUrl.replace(/https:\/\/.*@/, "https://").replace(/\.git$/, "").replace(/\/$/, "");
+
+              if (cleanCurrent === cleanTarget) {
+                originMatches = true;
+              }
+            } catch (metaErr) {
+              console.warn("Could not read API-based Git metadata:", metaErr);
+            }
           }
         }
 
@@ -88,11 +120,15 @@ export async function POST(req: Request) {
             }
           }
 
-          execSync(`git clone "${gitUrl}" .`, {
-            cwd: tempDir,
-            env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-            timeout: 25000
-          });
+          if (isGitAvailable()) {
+            execSync(`git clone "${gitUrl}" .`, {
+              cwd: tempDir,
+              env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+              timeout: 25000
+            });
+          } else {
+            await syncRepoViaApi(gitUrl, remoteToken, remoteRepoName, tempDir);
+          }
         }
       } catch (cloneErr: any) {
         console.error("Failed to automatically clone remote Git repository:", cloneErr);
@@ -103,15 +139,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // Automatically bootstrap folder directories (DEV, PRE, PROD) in the targeted location
-    try {
-      await Promise.all([
-        ensureFolderStructure("DEV"),
-        ensureFolderStructure("PRE"),
-        ensureFolderStructure("PROD")
-      ]);
-    } catch (bootstrapErr) {
-      console.warn("Folder bootstrap warning: could not initialize all paths immediately.", bootstrapErr);
+    // Automatically bootstrap folder directories (DEV, PRE, PROD) in the targeted location for local strategy
+    if (locationType === "local") {
+      try {
+        await Promise.all([
+          ensureFolderStructure("DEV"),
+          ensureFolderStructure("PRE"),
+          ensureFolderStructure("PROD")
+        ]);
+      } catch (bootstrapErr) {
+        console.warn("Folder bootstrap warning: could not initialize all paths immediately.", bootstrapErr);
+      }
     }
 
     return NextResponse.json({ success: true, settings });

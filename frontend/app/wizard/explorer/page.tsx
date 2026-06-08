@@ -46,7 +46,7 @@ export default function ExplorerHomePage() {
     {
       title: "Compare Workspaces - Monitoring Activity",
       description: "Compare DEV, PRE, and PROD Terraform states and merge differences.",
-      href: "/wizard/day0/diff?action=compare_wizard",
+      href: "/wizard/explorer/compare",
       icon: "🔀",
       gradient: "from-purple-500 via-purple-600 to-purple-700",
       glow: "hover:shadow-purple-500/20",

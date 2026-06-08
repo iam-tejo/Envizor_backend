@@ -159,7 +159,9 @@ export const MOCK_DB: Record<EnvName, {
     ],
     connections: [
       { id: "conn-dev-1", name: "DEV_DB_CONN", type: "Database", description: "Development DB Connection" },
-      { id: "conn-dev-2", name: "DEV_LDAP_CONN", type: "Active Directory", description: "Development LDAP Connection" }
+      { id: "conn-dev-2", name: "DEV_LDAP_CONN", type: "Active Directory", description: "Development LDAP Connection" },
+      { id: "conn-dev-3", name: "Billing_West_Portal", type: "Disconnected", description: "Legacy billing administrative interface" },
+      { id: "conn-dev-4", name: "Legacy_HR_Directory", type: "Disconnected", description: "Legacy employees directory database" }
     ],
     tasks: [
       { id: "job-dev-1", name: "Dev Task A", status: "SUCCESS", description: "Daily reconcile task" }
@@ -409,10 +411,18 @@ const ENV_CONFIGS: Record<EnvName, { url: string; username?: string; password?: 
   },
 };
 
+import { loadEnvLocalVariables } from "../workspaceConfig";
+
 export function createSaviyntClient(envInput: EnvName): SaviyntClient {
   const env = (envInput?.toUpperCase() || "DEV") as EnvName;
-  const config = ENV_CONFIGS[env] || ENV_CONFIGS.DEV;
-  const url = config.url;
+
+  try {
+    loadEnvLocalVariables();
+  } catch (e) {}
+
+  const url = process.env[`SAVIYNT_${env}_URL`] || ENV_CONFIGS[env]?.url || "";
+  const username = process.env[`SAVIYNT_${env}_USERNAME`] || ENV_CONFIGS[env]?.username || "";
+  const password = process.env[`SAVIYNT_${env}_PASSWORD`] || ENV_CONFIGS[env]?.password || "";
 
   // Ephemeral authentication closures (lifetime limited to 5 minutes)
   let cachedToken: string | null = null;
@@ -444,8 +454,8 @@ export function createSaviyntClient(envInput: EnvName): SaviyntClient {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: config.username,
-          password: config.password,
+          username: username,
+          password: password,
         }),
       });
 

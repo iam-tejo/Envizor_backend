@@ -8,10 +8,11 @@ export interface WizardStepInfo {
 
 export const WizardKnowledge = {
   overview: `
-The Envizor Platform comprises two core wizard flows designed to simplify and automate Saviynt IGA infrastructure deployment using Terraform:
+The Envizor Platform comprises three core wizard flows designed to simplify and automate Saviynt IGA infrastructure deployment:
 
 1. 🌟 **Day-0 Tenant Migration & Discovery Wizard**: Used to scan active environments, compare configuration drifts across DEV, PRE, and PROD, generate baseline modular Terraform workspaces, and perform environment alignments.
 2. 🛠️ **Day-N Standard Configuration Wizard**: Used to configure, package, upload, and deploy fresh endpoints, connections, security systems, accounts, entitlements, groups, roles, and background jobs.
+3. 🔌 **Disconnected Application Onboarding**: For applications that CANNOT be connected via live API to Saviynt. This module vaults credentials securely, runs an autonomous background agent (ScheduledAgentService.java) that periodically pulls data from the disconnected app on a per-application cron schedule, reconciles differences against Saviynt provisioning tasks, and uploads flat-file data to close the governance gap. Each application has its own schedule, and all runs are logged in a split audit log with separate tabs for "Scans & Uploads" and "Reconcile Operations".
   `,
 
   steps: {
@@ -167,8 +168,87 @@ The Review and Dry Run stage compiles all of your dynamic form inputs, verifies 
         "📝 How can I preview the raw HCL before saving?",
         "🚀 What is the final process to execute standard configs?"
       ]
+    },
+
+    // ----------------------------------------------------
+    // Disconnected Application Onboarding Module
+    // ----------------------------------------------------
+    disconnectedOnboarding: {
+      name: "Disconnected Application Onboarding",
+      purpose: `
+The Disconnected Application Onboarding module solves the enterprise challenge of applications that CANNOT be natively connected to Saviynt via a live API connector. Examples include legacy mainframe systems, on-premises HR systems behind firewalls, or COTS apps with read-only databases.
+
+The module operates in three phases:
+
+**Phase 1 — Target Application Profile**
+Register the disconnected application with:
+- Application name and description
+- Connection type (REST / JDBC / SFTP / File-based)
+- Secure vault credentials stored using AES-256 encryption (Strategy A — browser-side vault). No credentials are transmitted in plaintext. The vault key is derived from the user's session token.
+
+**Phase 2 — Schedule & Synchronize**
+Configure a per-application cron schedule (e.g. every 15 minutes, hourly, daily at 2am). The schedule is stored in the Next.js API at /api/wizard/disconnected/schedule.
+- The Spring Boot service ScheduledAgentService.java polls this endpoint every 5 seconds via @Scheduled(fixedDelay=5000).
+- When an app's scheduled window arrives, the agent triggers the sync flow: pulls data from the disconnected app, normalizes it to a Saviynt-compatible flat-file format, uploads it via the Saviynt File Upload API, and writes an audit record.
+- Each application has its own independent schedule. Changing the schedule for App A does not affect App B.
+- The UI shows the next scheduled run timestamp and the cron config rendered as human-readable English (e.g. "Every 30 minutes" instead of "*/30 * * * *").
+
+**Phase 3 — Audit Log Review**
+All agent executions are logged and split into two sub-tabs:
+- **Scans & Uploads tab**: Flat-file upload operations — when data was pulled, normalized, and uploaded to Saviynt. Columns: Application, Target Connection, Status, Timestamp, Records Uploaded, Next Run, Cron Config (English).
+- **Reconcile Operations tab**: Saviynt provisioning task reconciliation — when the agent compared the app's current identity data against provisioned state in Saviynt, identified discrepancies, and created/updated provisioning tasks. Columns: Application, Target Connection, Status, Timestamp, Tasks Created, Tasks Updated, Discrepancies Found, Next Run.
+
+Both tabs support:
+- **Free-text search** by target connection name
+- **Column sorting** by clicking any column header (ascending/descending toggle)
+      `,
+      assistantHelp: [
+        "🔌 What types of disconnected applications does Envizor support?",
+        "🔒 How are credentials stored securely without a backend vault?",
+        "⏰ How does the background agent scheduling work per application?",
+        "📊 What is the difference between a Scan/Upload and a Reconcile operation?",
+        "🤖 How does ScheduledAgentService.java trigger synchronization runs?",
+        "📋 How do I search and sort the audit log entries?",
+        "🔁 What happens if a synchronization fails mid-run?",
+        "🗓️ How do I change the sync schedule for a specific application?"
+      ]
     }
   } as Record<string, WizardStepInfo>,
+
+  architecture: {
+    disconnectedOnboarding: {
+      description: "The Disconnected Application Onboarding module bridges the gap between applications that have no live Saviynt API connector and the Envizor IGA governance platform. It uses a combination of browser-side credential vaulting, a Spring Boot scheduled polling service, and a Next.js API layer to autonomously synchronize identity data.",
+      javaServices: [
+        {
+          name: "ScheduledAgentService.java",
+          path: "src/main/java/terraform/backend/services/ScheduledAgentService.java",
+          description: "Spring @Service annotated with @Scheduled(fixedDelay=5000). Polls GET /api/wizard/disconnected/schedule every 5 seconds. For each registered application, checks if the current time has passed the 'nextRun' timestamp. If yes, triggers the synchronization flow: calls POST /api/wizard/disconnected/onboard to execute the data pull and upload, then POSTs an audit record to /api/wizard/disconnected/audit-logs and calculates the next scheduled run time based on the app's cron expression."
+        }
+      ],
+      apiRoutes: [
+        {
+          path: "/api/wizard/disconnected/schedule",
+          methods: ["GET", "POST"],
+          description: "GET: Returns all registered application schedules as JSON array, each entry containing appId, appName, cronExpression, cronEnglish (human-readable), nextRun (ISO timestamp), and lastRun. POST: Updates the schedule for a specific application given appId and newCronExpression. Called by ScheduledAgentService.java every 5 seconds (GET) and by the UI when the user confirms a schedule change (POST)."
+        },
+        {
+          path: "/api/wizard/disconnected/onboard",
+          methods: ["POST"],
+          description: "Registers a new disconnected application profile. Body: { appName, connectionType, targetUrl, vaultedCredentialRef, description }. Returns the generated appId and initial schedule config. Also invoked by ScheduledAgentService when triggering a sync run to execute the actual data pull-and-upload operation."
+        },
+        {
+          path: "/api/wizard/disconnected/audit-logs",
+          methods: ["GET", "POST"],
+          description: "GET: Retrieves paginated audit log entries for all applications. Supports query params: type (scans|reconcile), appId, targetConnection, sortBy, sortDir. POST: Appends a new audit record when ScheduledAgentService completes a run. Body includes: appId, runType (scan|reconcile), status, recordsProcessed, tasksCreated, tasksUpdated, discrepanciesFound, durationMs."
+        },
+        {
+          path: "/api/wizard/disconnected/tasks",
+          methods: ["GET"],
+          description: "Returns pending and completed Saviynt provisioning tasks generated by reconciliation engine runs. Used by the Reconcile Operations audit tab to show task-level detail. Supports filtering by appId and status (pending|completed|failed)."
+        }
+      ]
+    }
+  },
 
   navigation: {
     routes: {
@@ -184,7 +264,14 @@ The Review and Dry Run stage compiles all of your dynamic form inputs, verifies 
       operationSelection: "/wizard/steps/operation",
       objectTypeSelection: "/wizard/steps/object-type",
       dynamicFormInputs: "/wizard/steps/dynamic",
-      reviewAndDryRun: "/wizard/steps/review"
+      reviewAndDryRun: "/wizard/steps/review",
+
+      // Disconnected Onboarding routes
+      disconnectedOnboarding: "/wizard/disconnected-onboarding",
+      disconnectedScheduleApi: "/api/wizard/disconnected/schedule",
+      disconnectedAuditLogsApi: "/api/wizard/disconnected/audit-logs",
+      disconnectedOnboardApi: "/api/wizard/disconnected/onboard",
+      disconnectedTasksApi: "/api/wizard/disconnected/tasks"
     } as Record<string, string>
   }
 };

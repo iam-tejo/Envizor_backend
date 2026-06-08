@@ -157,6 +157,35 @@ Use the Drift Comparison tool to detect differences between DEV, PRE, and PROD c
 Run the DevOps Wizard to execute \`terraform plan\` → review → \`terraform apply\` on target environments.
 
 💡 **Need access to these tools?** As a BasicUser, your tiles are locked. Ask me to "request access" and I'll handle the gating form for you right here!`,
+
+  disconnected: `🔌 **Disconnected Application Onboarding & Push-Model Task Queue**
+
+Envizor's Disconnected Onboarding module brings legacy, air-gapped, or API-less applications under active IGA governance.
+
+**How to Onboard in the Console (What to Click & What Happens):**
+1. **Register Target Profile (Top-Left)**: Enter Connection Name, connection Type, URL, and Credentials. Click **Register Application** to vault credentials browser-side with AES-256 (Strategy A).
+2. **Set Sync Schedule (Top-Right)**: Choose the synchronization frequency and click **Confirm Schedule** to register the cron background job.
+3. **Developer Testing Playground (Bottom)**: Use the interactive forms to test REST API trigger endpoints in real-time (Trigger Import, Register Ticket, Execute, and Status Check).
+4. **Audit Runs Logs (Center)**: Check *Scans & Uploads* to see flat-file CSV uploads to Saviynt, and *Reconcile Operations* to inspect provisioning tasks and emulate writes.
+
+**Key Technical Features:**
+• **API-Triggered Imports**: REST endpoint \`POST /api/wizard/disconnected/import\` triggers target scrapes on-demand.
+• **Push-Model Provisioning**: Tickets are pushed from Saviynt to Envizor's Tasks API (\`POST /api/wizard/disconnected/tasks\` with actions to create or execute).
+• **Persistent JSON Database & Rotation**: local files (\`disconnected_tasks.json\` and \`disconnected_audit_logs.json\`) with auto-archiving.`,
+
+  deploy_agent: `🤖 **Deploy through Agent & GitOps Pipeline**
+
+Envizor's Agent Deployment module provides an automated, secure, and auditable pipeline to promote configurations across environments (DEV → PRE → PROD).
+
+**How to Deploy in the Console (What to Click & What Happens):**
+1. **Active Branches catalog (Top-Left)**: Select the branch containing the Terraform files you wish to deploy.
+2. **Terminal Console (Bottom)**: Watch live CLI outputs for 'terraform init' and 'terraform plan' commands.
+3. **Plan Inspector & Gate (Center-Right)**: When a plan is running, execution will pause. Review the detailed diff of additions/deletions, then click **Approve & Apply** or **Reject & Rollback**.
+4. **Completed Runs table (Bottom-Right)**: Review historical deployments, expand rows to inspect full agent stdout logs, and verify results.
+
+**Key Features:**
+• **7-Step Deployment Lifecycle**: Visual roadmap tracking from workspace init, HCL crawling, and branch pushing to dry-run planning, manual approval gating, write execution, and safety rollbacks.
+• **Ops Team Approval Gate**: Zero-trust control that halts deployment runs, requiring manual approval from the Plan Inspector before production releases.`,
 };
 
 // ─── Trivia Questions ─────────────────────────────────────────────────────────
@@ -337,6 +366,15 @@ function classifyIntent(input: string): string {
 
   // 16. Analytics Workbench
   if (/\b(analytics|sql|query|database|workbench)\b/.test(t) || t.includes("analytics workbench") || t.includes("sql query")) return "analytics";
+
+  // 16a. Disconnected Onboarding
+  if (/\b(disconnected|air-gapped|legacy app|onboard legacy|flat file|scans uploads)\b/.test(t) || t.includes("disconnected onboarding") || t.includes("disconnected app")) return "disconnected_onboarding";
+
+  // 16b. AI Agent Console
+  if (/\b(agent console|ai console|agent dashboard|agent brain|fs console|filesystem console)\b/.test(t) || t.includes("agent console") || t.includes("ai agent console")) return "agent_console";
+
+  // 16c. Deploy through Agent
+  if (/\b(deploy through agent|deploying agent|run deploying agent|agent deploy|deploy agent)\b/.test(t) || t.includes("deploy through agent") || t.includes("deploying agent")) return "deploy_agent";
 
   // 17. Help & Overview
   if (/\b(help|overview|what can you do|commands|options)\b/.test(t) || t.includes("help")) return "help";
@@ -897,7 +935,9 @@ export default function RightDockedChatbot({
       const allPerms = JSON.parse(localStorage.getItem("envizor_user_permissions") || "{}");
       allPerms[user.toLowerCase()] = [
         "tile-know-more", "tile-day0-setup", "tile-iga-explorer",
-        "tile-workspace-explorer", "tile-terraform-wizard", "tile-connected-app", "tile-analytics",
+        "tile-workspace-explorer", "tile-terraform-wizard", "tile-connected-app",
+        "tile-disconnected-app-onboarding", "tile-analytics", "tile-ai-agent",
+        "tile-deploy-agent"
       ];
       localStorage.setItem("envizor_user_permissions", JSON.stringify(allPerms));
 
@@ -1090,6 +1130,10 @@ export default function RightDockedChatbot({
         text: `👋 **Hello${name !== "user" ? `, ${name}` : ""}! Welcome to the Envizor Assistant.**\n\n${contextText}${isBasicUser ? "\n\n🔒 Your tiles are currently locked as **BasicUser** — ask me to **unlock your access** or **request a role** and I'll handle it right here!" : ""}`,
         options: [
           { label: "🚀 Start Interactive Deploy Flow", actionName: "deploy", desc: "Guided step-by-step credentials pulls, plans, and deployments" },
+          { label: "🤖 Deploy through Agent", actionName: "launch_deploy_agent", desc: "Schedule and run DEV -> PRE -> PROD deployments with Ops approvals" },
+          { label: "🔌 Disconnected App Onboarding", actionName: "launch_disconnected_app_onboarding", desc: "Onboard systems without APIs using emulate browser scraping" },
+          { label: "🧠 AI Agent Console", actionName: "launch_agent_console", desc: "Direct filesystem inspection and code modifications workspace" },
+          { label: "📊 SQL Analytics Workbench", actionName: "launch_analytics", desc: "Execute relational queries on identity schemas" },
           { label: "📦 Baseline Workspace — Day 0", actionName: "baseline_start", desc: "Discover Saviynt tenants and baseline Terraform configurations" },
           { label: "🔀 Compare Staging Schema", actionName: "compare", desc: "Analyse drift between DEV, PRE, and PROD environments" },
           { label: "🔑 Request Role Access", actionName: "show_role_request", desc: "Unlock locked tiles — JIT or Permanent elevation" },
@@ -1135,6 +1179,9 @@ export default function RightDockedChatbot({
       deploy: "tile-terraform-wizard",
       launch_connected_app: "tile-connected-app",
       launch_analytics: "tile-analytics",
+      launch_disconnected_app_onboarding: "tile-disconnected-app-onboarding",
+      launch_agent_console: "tile-ai-agent",
+      launch_deploy_agent: "tile-deploy-agent",
     };
     const tile = actionToTileMap[actionName];
     if (!tile) return true;
@@ -1220,6 +1267,38 @@ export default function RightDockedChatbot({
       setLeftPanelType("none");
       window.location.href = "/wizard/analytics";
       botReply("Opening **SQL Analytics Workbench** — run relational queries on pre-seeded Saviynt Identity Cloud schemas.");
+    } else if (name === "launch_disconnected_app_onboarding") {
+      setLeftPanelType("none");
+      const guideMessage = {
+        id: crypto.randomUUID(),
+        from: "bot" as const,
+        text: `🔌 **Onboarding Steps: Disconnected Application Onboarding**\n\nHere is how to onboard your application on this console:\n\n1. **Register Target Profile (Top-Left card)**: Enter the Connection Name, connection Type, target URL, and Credentials. Click **Register Application** to vault credentials browser-side with AES-256.\n2. **Set Sync Schedule (Top-Right card)**: Choose the synchronization frequency (e.g., 15 minutes, Hourly, Daily) and click **Confirm Schedule** to configure the autonomous background runner.\n3. **Developer Testing Playground (Bottom card)**: Use the interactive forms to test API endpoints in real-time. You can trigger imports, register tickets, execute provisioning runs, or query task status.\n4. **Audit Runs Logs (Center tabs)**: Check the *Scans & Uploads* tab to monitor flat-file CSV uploads to Saviynt, and the *Reconcile Operations* tab to inspect provisioning tasks and emulate target writes.`,
+        useTypewriter: true
+      };
+      const existingMessages = sessionStorage.getItem("envizor_chat_messages");
+      const msgs = existingMessages ? JSON.parse(existingMessages) : [];
+      msgs.push({ id: crypto.randomUUID(), from: "user" as const, text: label });
+      msgs.push(guideMessage);
+      sessionStorage.setItem("envizor_chat_messages", JSON.stringify(msgs));
+      window.location.href = "/wizard/disconnected-onboarding";
+    } else if (name === "launch_agent_console") {
+      setLeftPanelType("none");
+      window.location.href = "/wizard/agent";
+      botReply("Opening **AI Agent Console** — chat with Envizor's agentic brain and inspect/modify local code!");
+    } else if (name === "launch_deploy_agent") {
+      setLeftPanelType("none");
+      const guideMessage = {
+        id: crypto.randomUUID(),
+        from: "bot" as const,
+        text: `🤖 **Onboarding Steps: Deploy through Agent**\n\nHere is how to deploy your configuration workspaces through the agent:\n\n1. **Active Branches Catalog (Top-Left)**: Select the branch containing the Terraform files you wish to deploy.\n2. **Terminal Console (Bottom)**: Watch live CLI outputs for 'terraform init' and 'terraform plan' commands.\n3. **Plan Inspector & Gate (Center-Right)**: When a plan is running, execution will pause. Review the detailed diff of additions/deletions, then click **Approve & Apply** or **Reject & Rollback**.\n4. **Completed Runs (Bottom-Right)**: Review historical deployments, expand rows to inspect full agent stdout logs, and verify results.`,
+        useTypewriter: true
+      };
+      const existingMessages = sessionStorage.getItem("envizor_chat_messages");
+      const msgs = existingMessages ? JSON.parse(existingMessages) : [];
+      msgs.push({ id: crypto.randomUUID(), from: "user" as const, text: label });
+      msgs.push(guideMessage);
+      sessionStorage.setItem("envizor_chat_messages", JSON.stringify(msgs));
+      window.location.href = "/wizard/deploy-agent";
     } else if (name === "launch_admin_console") {
       setLeftPanelType("none");
       window.location.href = "/wizard/admin";
@@ -1703,6 +1782,21 @@ export default function RightDockedChatbot({
             break;
           case "analytics":
             handleActionNameClick("launch_analytics", "Launch Analytics");
+            break;
+          case "disconnected_onboarding":
+            addBotMessage(ENVIZOR_KB.disconnected, [
+              { label: "🔌 Open Onboarding Console", actionName: "launch_disconnected_app_onboarding" },
+              { label: "🔑 Request Access", actionName: "show_role_request" }
+            ], undefined, true);
+            break;
+          case "agent_console":
+            handleActionNameClick("launch_agent_console", "AI Agent Console");
+            break;
+          case "deploy_agent":
+            addBotMessage(ENVIZOR_KB.deploy_agent, [
+              { label: "🤖 Launch Deployment Agent", actionName: "launch_deploy_agent" },
+              { label: "🔑 Request Access", actionName: "show_role_request" }
+            ], undefined, true);
             break;
           case "help":
             handleActionNameClick("help", "Help & Overview");

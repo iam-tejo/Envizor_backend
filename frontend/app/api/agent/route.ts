@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import { getWorkspaceRoot } from "../../lib/workspaceConfig";
 
 // Safe resolve within workspace root to prevent directory traversal outside workspace
 const WORKSPACE_ROOT = path.resolve(process.cwd(), "..");
@@ -706,6 +707,104 @@ Welcome to Envizor's local handbook. Use keywords like **Spring Boot**, **Terraf
   return article;
 }
 
+function getLocalWorkspaceDetails(): string {
+  const root = getWorkspaceRoot();
+  let details = `💻 **Local Workspace Details:**\n\n`;
+  details += `* **Workspace Root Directory:** \`${root}\`\n`;
+
+  if (!fs.existsSync(root)) {
+    details += `⚠️ **Warning:** The configured workspace root directory does not exist or is not accessible. Please set a valid workspace directory in the Day 0 setup.\n`;
+    return details;
+  }
+
+  const envs = ["DEV", "PRE", "PROD"];
+  details += `\n### 📂 Environment Workspace Structures\n\n`;
+  
+  let hasAnyEnv = false;
+
+  for (const env of envs) {
+    const envPath = path.join(root, env);
+    if (fs.existsSync(envPath)) {
+      hasAnyEnv = true;
+      try {
+        const items = fs.readdirSync(envPath, { withFileTypes: true });
+        const tfFiles = items.filter(item => !item.isDirectory() && item.name.endsWith(".tf"));
+        const otherFiles = items.filter(item => !item.isDirectory() && !item.name.endsWith(".tf") && !item.name.startsWith("."));
+        const subDirs = items.filter(item => item.isDirectory() && !item.name.startsWith("."));
+        
+        details += `#### 🔹 Env: \`${env}\`\n`;
+        details += `* **Path:** \`${envPath}\`\n`;
+        
+        if (tfFiles.length === 0 && otherFiles.length === 0 && subDirs.length === 0) {
+          details += `* *Directory is empty.*\n\n`;
+        } else {
+          if (tfFiles.length > 0) {
+            details += `* **Terraform Configurations (${tfFiles.length}):**\n`;
+            tfFiles.forEach(f => {
+              const filePath = path.join(envPath, f.name);
+              const stats = fs.statSync(filePath);
+              const size = (stats.size / 1024).toFixed(2);
+              details += `  - 📄 \`${f.name}\` (${size} KB)\n`;
+            });
+          }
+          if (otherFiles.length > 0) {
+            details += `* **Other Files (${otherFiles.length}):**\n`;
+            otherFiles.forEach(f => {
+              const filePath = path.join(envPath, f.name);
+              const stats = fs.statSync(filePath);
+              const size = (stats.size / 1024).toFixed(2);
+              details += `  - 📄 \`${f.name}\` (${size} KB)\n`;
+            });
+          }
+          if (subDirs.length > 0) {
+            details += `* **Subdirectories (${subDirs.length}):**\n`;
+            subDirs.forEach(d => {
+              details += `  - 📁 \`${d.name}/\`\n`;
+            });
+          }
+          details += `\n`;
+        }
+      } catch (err: any) {
+        details += `❌ *Error scanning directory: ${err.message}*\n\n`;
+      }
+    } else {
+      details += `#### 🔹 Env: \`${env}\`\n`;
+      details += `* *Directory does not exist yet.*\n\n`;
+    }
+  }
+
+  try {
+    const rootItems = fs.readdirSync(root, { withFileTypes: true });
+    const rootTfvars = rootItems.filter(item => !item.isDirectory() && item.name.endsWith(".tfvars"));
+    const rootOther = rootItems.filter(item => !item.isDirectory() && (item.name.startsWith(".env") || item.name.endsWith(".json")) && !item.name.startsWith(".DS_Store"));
+    
+    if (rootTfvars.length > 0 || rootOther.length > 0) {
+      details += `### ⚙️ Root Configuration Files\n\n`;
+      if (rootTfvars.length > 0) {
+        details += `* **Terraform Variables (.tfvars):**\n`;
+        rootTfvars.forEach(f => {
+          const filePath = path.join(root, f.name);
+          const stats = fs.statSync(filePath);
+          const size = (stats.size / 1024).toFixed(2);
+          details += `  - 📄 \`${f.name}\` (${size} KB)\n`;
+        });
+      }
+      if (rootOther.length > 0) {
+        details += `* **Other Configs:**\n`;
+        rootOther.forEach(f => {
+          const filePath = path.join(root, f.name);
+          const stats = fs.statSync(filePath);
+          const size = (stats.size / 1024).toFixed(2);
+          details += `  - 📄 \`${f.name}\` (${size} KB)\n`;
+        });
+      }
+      details += `\n`;
+    }
+  } catch (e) {}
+
+  return details;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -831,10 +930,54 @@ export async function POST(req: NextRequest) {
 
     // 4. CHAT / AGENT ORCHESTRATION
     if (action === "chat") {
+      const lower = prompt.toLowerCase().trim();
+      const isLocalRequest = lower === "local" || 
+                             lower === "workspace details" || 
+                             lower === "workspace details for local" || 
+                             lower.includes("show local workspace") || 
+                             lower.includes("local workspace details") ||
+                             (lower.includes("local") && (lower.includes("workspace") || lower.includes("detail")));
+
+      if (isLocalRequest) {
+        const responseText = getLocalWorkspaceDetails();
+        return NextResponse.json({
+          status: "success",
+          response: responseText,
+          toolCalls: [{
+            tool: "local_workspace_details",
+            target: "local_directory",
+            status: "SUCCESS"
+          }],
+          hasChanges: false,
+          diff: "",
+          targetFile: activeFile || "",
+          modifiedContent: ""
+        });
+      }
+
       if (geminiApiKey) {
         try {
           const systemPrompt = `You are Envizor, a premium, hyper-intelligent agentic developer coding assistant.
 You are helping the user modify or analyze their workspace code.
+
+Here is the complete architectural context of the Envizor application:
+1. System Architecture & Flow:
+   - Next.js Frontend Steps -> Zustand Store (useWizardStore.ts) -> Spring REST API -> WizardService -> Local/Remote Workspace output.
+2. Java Backend Classes Reference:
+   - WizardController.java: Maps requests /wizard/workspace (saves path), /wizard/environment (saves env), /wizard/object-types (saves types list), /wizard/preview (returns in-memory HCL file map), /wizard/generate (writes HCL module files to disk), /wizard/reset (resets wizard state session).
+   - WizardService.java: Generation engine interpolating variables.tf, outputs.tf, providers.tf, main.tf templates, and normalizing object keys (e.g. converting 'usergroups' to 'user_groups').
+   - WizardState.java: Data Transfer Object representing active environment, workspace, and selected object types.
+   - WizardStateManager.java: Thread-safe cache holding session instances.
+   - ObjectSelection.java & TransportArtefact.java: Payload data structures for review parameters.
+   - BackEndApplication.java: Entry Spring Boot application class starting embedded Tomcat.
+3. Next.js Frontend Step Triggers:
+   - welcome step: triggers /wizard/reset to wipe old session details.
+   - operation step: caches operations in local Zustand store.
+   - object-type step: triggers /wizard/object-types to sync selected classes.
+   - dynamic step: generates dynamic forms mapping attribute key-values.
+   - review step: triggers /wizard/preview (dry-run tf generation) and /wizard/generate (commits HCL modules to disk).
+
+When asked about how the code works, how classes are called, or which wizard step triggers which class, output this mapping in a detailed and clear manner.
 
 You have access to the user's currently selected active file.
 Active File Path: ${activeFile || "None"}
@@ -910,7 +1053,6 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
         }
       }
 
-      const lower = prompt.toLowerCase();
       let responseText = "";
       const toolCalls: any[] = [];
       let diffReport = "";
@@ -918,8 +1060,16 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
       let targetFilePath = activeFile || "";
       let modifiedContent = "";
 
-      // ─── Workspace Search handling ──────────────────────────────────────────
-      if (lower.includes("find ") || lower.includes("search for ") || lower.includes("grep ") || lower.includes("locate ")) {
+      // ─── Codebase Architecture details fallback check ────────────────────
+      if (lower.includes("how code works") || lower.includes("architecture") || lower.includes("class trigger") || lower.includes("how every class is called") || lower.includes("class is called") || lower.includes("wizard trigger")) {
+        responseText = `🧠 **Envizor Developer Architecture Knowledge Base:**\n\nHere is a detailed map of how the classes are called and how the wizard triggers them:\n\n### 🧬 System Flow Overview:\n1. **Next.js Frontend Steps** cache configuration parameters in the browser's **Zustand store** (\`useWizardStore.ts\`).\n2. When proceeding to final steps, parameters are dispatched as JSON arrays to **Spring REST Controller endpoints** on the Java backend.\n3. The **Controller** calls the **Service Layer** to run template interpolations.\n4. Completed module configurations are outputted directly to the **Workspace Folder** on disk.\n\n### ☕ Java Class Details:\n* **\`WizardController.java\`**: Exposes HTTP endpoints under \`/wizard\`:\n  - \`/workspace\` (POST): Saves target workspace path.\n  - \`/environment\` (POST): Saves active target environment.\n  - \`/object-types\` (POST): Syncs chosen object types list.\n  - \`/preview\` (POST): Generates in-memory dry-run Terraform modules.\n  - \`/generate\` (POST): Writes compiled HCL files (\`main.tf\`, \`variables.tf\`, modules) to disk.\n  - \`/reset\` (POST): Resets session state.\n* **\`WizardService.java\`**: Contains all Terraform HCL templates (Accounts, Entitlements, Roles, etc.). Normalizes keys and compiles parameters.\n* **\`WizardState.java\`**: Data Transfer Object storing env, workspace, and selected types.\n* **\`WizardStateManager.java\`**: Manages single local session instance thread-safely.\n* **\`ObjectSelection.java\` & \`TransportArtefact.java\`**: Model bindings for parsing input payload arrays.\n\n### 🖥️ Wizard Step Trigger Mapping:\n* **Welcome Step (\`welcome\`)**: Triggers \`/wizard/reset\` to clean session references.\n* **Operation Step (\`operation\`)**: Configures chosen operations (STANDARD, IMPORT, EXPORT) to toggle wizard routing branches.\n* **Object Type Step (\`object-type\`)**: Calls \`/wizard/object-types\` to save selections.\n* **Dynamic Step (\`dynamic\`)**: Dynamic forms caching attribute properties into Zustand store.\n* **Review Step (\`review\`)**: Dispatches selection array to \`/wizard/preview\` (dry-run tf) and \`/wizard/generate\` (commits files to disk).`;
+        toolCalls.push({
+          tool: "offline_knowledge_base",
+          target: "architecture_walkthrough",
+          status: "SUCCESS"
+        });
+      }
+      else if (lower.includes("find ") || lower.includes("search for ") || lower.includes("grep ") || lower.includes("locate ")) {
         let query = prompt;
         const searchPrefixes = ["search for ", "find ", "grep ", "locate "];
         for (const pref of searchPrefixes) {
@@ -1038,8 +1188,8 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
       }
       // ─── Theme addition handling ──────────────────────────────────────────
       else if (lower.includes("theme")) {
-        const contextPath = "app/lib/ThemeContext.tsx";
-        const cssPath = "app/globals.css";
+        const contextPath = "frontend/app/lib/ThemeContext.tsx";
+        const cssPath = "frontend/app/globals.css";
 
         let originalContext = "";
         let originalCss = "";
@@ -1075,58 +1225,231 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
             status: "SUCCESS"
           });
 
-          // Check if already modified
-          if (!originalContext.includes("sunset")) {
-            // Modify ThemeContext.tsx
-            const sunsetMeta = '  { id: "sunset",    label: "Sunset",    accent: "#781a08", emoji: "🌇" },\n';
-            const modifiedContext = originalContext.replace(
-              '  { id: "forest",    label: "Forest",    accent: "#052e16", emoji: "🌿" },',
-              '  { id: "forest",    label: "Forest",    accent: "#052e16", emoji: "🌿" },\n' + sunsetMeta
-            );
+          // Parse theme request dynamically
+          let requestedTheme = "";
+          const themeMatch = prompt.match(/\b(\w+)\s+theme/i) || prompt.match(/theme\s+(\w+)/i);
+          if (themeMatch && themeMatch[1]) {
+            const candidate = themeMatch[1].toLowerCase();
+            const ignoreWords = ["new", "another", "one", "more", "the", "dark", "light", "ocean", "cyberpunk", "forest", "sunset", "my", "custom", "beautiful", "wizard"];
+            if (!ignoreWords.includes(candidate)) {
+              requestedTheme = candidate;
+            }
+          }
 
-            // Modify globals.css
-            const sunsetCss = `
-/* ── SUNSET ── */
-[data-theme="sunset"] {
-  --bg-base:        #1a0b08;
-  --bg-surface:     #2e120d;
-  --bg-panel:       #441b12;
-  --bg-elevated:    #5c2419;
-  --border:         #782d1e;
-  --border-subtle:  #441b12;
-  --text-primary:   #fef2f2;
-  --text-secondary: #fca5a5;
-  --text-muted:     #f87171;
-  --accent:         #f97316;
-  --accent-glow:    rgba(249,115,22,0.25);
-  --accent-hover:   #ea580c;
-  --code-bg:        #120705;
-  --code-text:      #fed7aa;
-  --success:        #f97316;
-  --warning:        #facc15;
+          const candidateThemes = [
+            { id: "lavender", label: "Lavender", accent: "#8b5cf6", emoji: "🪻" },
+            { id: "coffee",   label: "Coffee",   accent: "#7c2d12", emoji: "☕" },
+            { id: "cherry",   label: "Cherry",   accent: "#be123c", emoji: "🍒" },
+            { id: "midnight", label: "Midnight", accent: "#38bdf8", emoji: "🌌" }
+          ];
+
+          let selectedTheme = candidateThemes[0];
+          if (requestedTheme) {
+            const matched = candidateThemes.find(t => t.id === requestedTheme);
+            if (matched) {
+              selectedTheme = matched;
+            } else {
+              let hash = 0;
+              for (let i = 0; i < requestedTheme.length; i++) {
+                hash = requestedTheme.charCodeAt(i) + ((hash << 5) - hash);
+              }
+              const color = `hsl(${Math.abs(hash) % 360}, 70%, 50%)`;
+              selectedTheme = {
+                id: requestedTheme,
+                label: requestedTheme.charAt(0).toUpperCase() + requestedTheme.slice(1),
+                accent: color,
+                emoji: "🎨"
+              };
+            }
+          } else {
+            const unused = candidateThemes.find(t => !originalContext.includes(t.id));
+            if (unused) {
+              selectedTheme = unused;
+            } else {
+              selectedTheme = {
+                id: "neon",
+                label: "Neon",
+                accent: "#10b981",
+                emoji: "🟢"
+              };
+            }
+          }
+
+          if (!originalContext.includes(selectedTheme.id)) {
+            // Modify ThemeId type
+            let modifiedContext = originalContext;
+            const themeIdMatch = modifiedContext.match(/export type ThemeId = (.*?);/);
+            if (themeIdMatch) {
+              const currentTypes = themeIdMatch[1];
+              if (!currentTypes.includes(`"${selectedTheme.id}"`)) {
+                const newTypes = `${currentTypes} | "${selectedTheme.id}"`;
+                modifiedContext = modifiedContext.replace(themeIdMatch[0], `export type ThemeId = ${newTypes};`);
+              }
+            }
+
+            // Modify THEMES array
+            const themesArrayMatch = modifiedContext.match(/export const THEMES: ThemeMeta\[\] = \[\s*([\s\S]*?)\s*\];/);
+            if (themesArrayMatch) {
+              const arrayContent = themesArrayMatch[1];
+              if (!arrayContent.includes(`id: "${selectedTheme.id}"`)) {
+                const newThemeMeta = `  { id: "${selectedTheme.id}", label: "${selectedTheme.label}", accent: "${selectedTheme.accent}", emoji: "${selectedTheme.emoji}" },\n`;
+                modifiedContext = modifiedContext.replace(
+                  /export const THEMES: ThemeMeta\[\] = \[\s*([\s\S]*?)\s*\];/,
+                  `export const THEMES: ThemeMeta[] = [\n$1  ${newThemeMeta}];`
+                );
+              }
+            }
+
+            // Generate CSS
+            let themeCss = "";
+            if (selectedTheme.id === "lavender") {
+              themeCss = `
+/* ── LAVENDER ── */
+[data-theme="lavender"] {
+  --bg-base:        #0f0b1a;
+  --bg-surface:     #1a122e;
+  --bg-panel:       #271b44;
+  --bg-elevated:    #35245c;
+  --border:         #4c3478;
+  --border-subtle:  #271b44;
+  --text-primary:   #f5f3ff;
+  --text-secondary: #ddd6fe;
+  --text-muted:     #a78bfa;
+  --accent:         #8b5cf6;
+  --accent-glow:    rgba(139,92,246,0.25);
+  --accent-hover:   #7c3aed;
+  --code-bg:        #0a0712;
+  --code-text:      #e9d5ff;
+  --success:        #10b981;
+  --warning:        #f59e0b;
   --danger:         #ef4444;
-  --tag-bg:         rgba(249,115,22,0.15);
-  --tag-text:       #ffedd5;
-  --scrollbar:      #782d1e;
-  --scrollbar-thumb:#f97316;
+  --tag-bg:         rgba(139,92,246,0.15);
+  --tag-text:       #f3e8ff;
+  --scrollbar:      #4c3478;
+  --scrollbar-thumb:#8b5cf6;
 }
 `;
+            } else if (selectedTheme.id === "coffee") {
+              themeCss = `
+/* ── COFFEE ── */
+[data-theme="coffee"] {
+  --bg-base:        #120c0a;
+  --bg-surface:     #1f1410;
+  --bg-panel:       #2e1f1a;
+  --bg-elevated:    #3e2a22;
+  --border:         #543a30;
+  --border-subtle:  #2e1f1a;
+  --text-primary:   #faf8f7;
+  --text-secondary: #ebdcd5;
+  --text-muted:     #cca899;
+  --accent:         #a2664d;
+  --accent-glow:    rgba(162,102,77,0.25);
+  --accent-hover:   #8a523a;
+  --code-bg:        #0a0706;
+  --code-text:      #f5e6e0;
+  --success:        #10b981;
+  --warning:        #f59e0b;
+  --danger:         #ef4444;
+  --tag-bg:         rgba(162,102,77,0.15);
+  --tag-text:       #fdf6f0;
+  --scrollbar:      #543a30;
+  --scrollbar-thumb:#a2664d;
+}
+`;
+            } else if (selectedTheme.id === "cherry") {
+              themeCss = `
+/* ── CHERRY ── */
+[data-theme="cherry"] {
+  --bg-base:        #140507;
+  --bg-surface:     #240b0e;
+  --bg-panel:       #381317;
+  --bg-elevated:    #4c1a20;
+  --border:         #68252d;
+  --border-subtle:  #381317;
+  --text-primary:   #fff1f2;
+  --text-secondary: #fecdd3;
+  --text-muted:     #fda4af;
+  --accent:         #e11d48;
+  --accent-glow:    rgba(225,29,72,0.25);
+  --accent-hover:   #be123c;
+  --code-bg:        #0d0305;
+  --code-text:      #ffe4e6;
+  --success:        #10b981;
+  --warning:        #f59e0b;
+  --danger:         #ef4444;
+  --tag-bg:         rgba(225,29,72,0.15);
+  --tag-text:       #fff1f2;
+  --scrollbar:      #68252d;
+  --scrollbar-thumb:#e11d48;
+}
+`;
+            } else if (selectedTheme.id === "midnight") {
+              themeCss = `
+/* ── MIDNIGHT ── */
+[data-theme="midnight"] {
+  --bg-base:        #020617;
+  --bg-surface:     #0f172a;
+  --bg-panel:       #1e293b;
+  --bg-elevated:    #334155;
+  --border:         #475569;
+  --border-subtle:  #1e293b;
+  --text-primary:   #f8fafc;
+  --text-secondary: #e2e8f0;
+  --text-muted:     #94a3b8;
+  --accent:         #38bdf8;
+  --accent-glow:    rgba(56,189,248,0.25);
+  --accent-hover:   #0ea5e9;
+  --code-bg:        #0b0f19;
+  --code-text:      #e0f2fe;
+  --success:        #10b981;
+  --warning:        #f59e0b;
+  --danger:         #ef4444;
+  --tag-bg:         rgba(56,189,248,0.15);
+  --tag-text:       #f0f9ff;
+  --scrollbar:      #475569;
+  --scrollbar-thumb:#38bdf8;
+}
+`;
+            } else {
+              themeCss = `
+/* ── ${selectedTheme.id.toUpperCase()} ── */
+[data-theme="${selectedTheme.id}"] {
+  --bg-base:        #0d0e12;
+  --bg-surface:     #151821;
+  --bg-panel:       #1e2330;
+  --bg-elevated:    #2a3042;
+  --border:         #3b435c;
+  --border-subtle:  #1e2330;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted:     #94a3b8;
+  --accent:         ${selectedTheme.accent};
+  --accent-glow:    rgba(148,163,184,0.15);
+  --accent-hover:   ${selectedTheme.accent};
+  --code-bg:        #08090c;
+  --code-text:      #e2e8f0;
+  --success:        #10b981;
+  --warning:        #f59e0b;
+  --danger:         #ef4444;
+  --tag-bg:         rgba(148,163,184,0.1);
+  --tag-text:       #cbd5e1;
+  --scrollbar:      #3b435c;
+  --scrollbar-thumb:${selectedTheme.accent};
+}
+`;
+            }
 
             let modifiedCss = originalCss;
-            if (!originalCss.includes('[data-theme="sunset"]')) {
-              modifiedCss = originalCss.replace(
-                '/* ── FOREST ── */',
-                sunsetCss + '/* ── FOREST ── */'
-              );
+            if (!originalCss.includes(`[data-theme="${selectedTheme.id}"]`)) {
+              modifiedCss = originalCss + "\n" + themeCss;
             }
 
             hasChanges = true;
             targetFilePath = contextPath;
             modifiedContent = modifiedContext;
 
-            // Commit CSS update right away so the stylesheets are updated immediately
             if (isRemoteMode) {
-              await commitGithubFile(githubRepo, githubToken, githubBranch, cssPath, modifiedCss, `🤖 Envizor AI Agent: Injected Sunset Theme variables to globals.css`);
+              await commitGithubFile(githubRepo, githubToken, githubBranch, cssPath, modifiedCss, `🤖 Envizor AI Agent: Injected ${selectedTheme.label} Theme variables to globals.css`);
             } else {
               const fullCssPath = getSafePath(cssPath);
               fs.writeFileSync(fullCssPath, modifiedCss, "utf-8");
@@ -1138,11 +1461,11 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
               status: "SUCCESS"
             });
 
-            diffReport = `--- a/ThemeContext.tsx\n+++ b/ThemeContext.tsx\n@@ -17,5 +17,6 @@\n   { id: "cyberpunk", label: "Cyberpunk", accent: "#18011a", emoji: "⚡" },\n   { id: "forest",    label: "Forest",    accent: "#052e16", emoji: "🌿" },\n+  { id: "sunset",    label: "Sunset",    accent: "#781a08", emoji: "🌇" },\n ];`;
+            diffReport = `--- a/ThemeContext.tsx\n+++ b/ThemeContext.tsx\n@@ ThemeId and THEMES @@\n+ ${selectedTheme.label} Theme added.`;
 
-            responseText = `🌇 **Warm Sunset Theme Generated & Staged!**\n\nI have successfully designed a beautiful **Sunset Theme** (warm cherry-mahogany backgrounds with glowing tangerine orange accents swatches \`🌇\`) and registered it inside your workspace.\n\n* **Actions taken:**\n  1. Read \`ThemeContext.tsx\` and \`globals.css\`\n  2. Injected \`[data-theme="sunset"]\` styles into your CSS variables sheet\n  3. Staged registration of the \`sunset\` token in \`ThemeContext.tsx\`\n\n* **Next steps:** Click **Apply & Save to Local Workspace** on the right to commit the Context modifications, and then check Vercel deployments!`;
+            responseText = `${selectedTheme.emoji} **Warm ${selectedTheme.label} Theme Generated & Staged!**\n\nI have successfully designed a beautiful **${selectedTheme.label} Theme** (using custom dark backgrounds and glowing ${selectedTheme.accent} accents swatches \`${selectedTheme.emoji}\`) and registered it inside your workspace.\n\n* **Actions taken:**\n  1. Read \`ThemeContext.tsx\` and \`globals.css\`\n  2. Injected \`[data-theme="${selectedTheme.id}"]\` styles into your CSS variables sheet\n  3. Staged registration of the \`${selectedTheme.id}\` token and type in \`ThemeContext.tsx\`\n\n* **Next steps:** Click **Apply & Save to Local Workspace** on the right to commit the Context modifications, and then check Vercel deployments!`;
           } else {
-            responseText = `🧠 **AI Agent Brain Insight:**\n\nThe Sunset theme is already fully registered and configured in your workspace! Navigate to your top-right header and toggle through the theme presets to select the **Sunset** swatches 🌇!`;
+            responseText = `🧠 **AI Agent Brain Insight:**\n\nThe ${selectedTheme.label} theme is already fully registered and configured in your workspace! Navigate to your top-right header and toggle through the theme presets to select the **${selectedTheme.label}** swatches ${selectedTheme.emoji}!`;
           }
         } else {
           responseText = `🧠 **AI Agent Brain Error:**\n\nI could not locate \`ThemeContext.tsx\` or \`globals.css\` in the expected directories. Please check that you are running within the correct Next.js workspace structure.`;
@@ -1158,9 +1481,15 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
             if (fs.existsSync(checkPath)) {
               targetFilePath = potentialPath;
             } else {
+              const frontendAppPath = path.join("frontend", "app", potentialPath);
               const appPath = path.join("app", potentialPath);
-              if (fs.existsSync(getSafePath(appPath))) {
+              const frontendPath = path.join("frontend", potentialPath);
+              if (fs.existsSync(getSafePath(frontendAppPath))) {
+                targetFilePath = frontendAppPath;
+              } else if (fs.existsSync(getSafePath(appPath))) {
                 targetFilePath = appPath;
+              } else if (fs.existsSync(getSafePath(frontendPath))) {
+                targetFilePath = frontendPath;
               }
             }
           }
@@ -1171,11 +1500,11 @@ You MUST return ONLY a valid, parseable JSON object matching one of these struct
           
           if (!targetFilePath) {
             if (lower.includes("baseline/page.tsx") || lower.includes("baseline page")) {
-              targetFilePath = "app/wizard/day0/baseline/page.tsx";
+              targetFilePath = "frontend/app/wizard/day0/baseline/page.tsx";
             } else if (lower.includes("layout.tsx") || lower.includes("layout")) {
-              targetFilePath = "app/wizard/layout.tsx";
+              targetFilePath = "frontend/app/wizard/layout.tsx";
             } else if (lower.includes("globals.css") || lower.includes("css")) {
-              targetFilePath = "app/globals.css";
+              targetFilePath = "frontend/app/globals.css";
             }
           }
         }

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TASK-8802",
+    "targetSystem": "Legacy Billing Portal",
+    "operation": "CREATE_ACCOUNT",
+    "accountName": "jdoe@company.com",
+    "details": "Role: Billing Analyst, Status: ACTIVE",
+    "status": "PENDING",
+    "createdAt": "2026-06-07T19:00:00.503Z",
+    "updatedAt": "2026-06-07T19:00:00.503Z"
+  },
+  {
+    "id": "TASK-8803",
+    "targetSystem": "Legacy Billing Portal",
+    "operation": "ADD_ACCESS",
+    "accountName": "jdoe@company.com",
+    "details": "Privilege: Invoice_Editor",
+    "status": "PENDING",
+    "createdAt": "2026-06-07T20:00:00.503Z",
+    "updatedAt": "2026-06-07T20:00:00.503Z"
+  },
+  {
+    "id": "TASK-8805",
+    "targetSystem": "Legacy Billing Portal",
+    "operation": "REMOVE_ACCESS",
+    "accountName": "rkumar@company.com",
+    "details": "Privilege: Admin_Dashboard",
+    "status": "PENDING",
+    "createdAt": "2026-06-07T21:00:00.503Z",
+    "updatedAt": "2026-06-07T21:00:00.503Z"
+  },
+  {
+    "id": "TASK-1001",
+    "targetSystem": "Legacy Billing Portal",
+    "operation": "CREATE_ACCOUNT",
+    "accountName": "alice@company.com",
+    "details": "Role: Developer",
+    "status": "COMPLETED",
+    "createdAt": "2026-06-07T22:05:35.979Z",
+    "updatedAt": "2026-06-07T22:05:40.185Z"
+  },
+  {
+    "id": "TASK-8804",
+    "targetSystem": "Legacy HR Database",
+    "operation": "DISABLE_ACCOUNT",
+    "accountName": "asmith@company.com",
+    "details": "Status: TERMINATED",
+    "status": "COMPLETED",
+    "createdAt": "2026-06-07T20:30:00.503Z",
+    "updatedAt": "2026-06-07T21:00:00.504Z"
+  }
+]

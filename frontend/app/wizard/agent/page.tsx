@@ -24,9 +24,13 @@ export default function AgentConsolePage() {
   const [stagedContent, setStagedContent] = useState("");
   const [stagedAvailable, setStagedAvailable] = useState(false);
 
+  // Build Validation States
+  const [buildValidationStatus, setBuildValidationStatus] = useState<"idle" | "checking" | "success" | "failed">("idle");
+  const [buildValidationError, setBuildValidationError] = useState("");
+
   // GitHub Integration states
   const [agentMode, setAgentMode] = useState<"local" | "github">("local");
-  const [githubRepo, setGithubRepo] = useState("tejomba-1080s-projects/frontend");
+  const [githubRepo, setGithubRepo] = useState("iam-tejo/Envizor_backend");
   const [githubToken, setGithubToken] = useState("");
   const [githubBranch, setGithubBranch] = useState("main");
   const [showTokenInput, setShowTokenInput] = useState(false);
@@ -354,6 +358,32 @@ export default function AgentConsolePage() {
     localStorage.setItem("envizor_gemini_api_key", val);
   };
 
+  const runBuildValidation = async () => {
+    setBuildValidationStatus("checking");
+    setBuildValidationError("");
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "build",
+          command: "npm run build",
+          ...(agentMode === "github" ? { githubToken, githubRepo, githubBranch } : {})
+        })
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setBuildValidationStatus("success");
+      } else {
+        setBuildValidationStatus("failed");
+        setBuildValidationError(data.output || data.error || "Compilation failed.");
+      }
+    } catch (err: any) {
+      setBuildValidationStatus("failed");
+      setBuildValidationError(err.message || "Network error.");
+    }
+  };
+
   const handleSendPrompt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!promptInput.trim() || loading) return;
@@ -403,6 +433,7 @@ export default function AgentConsolePage() {
           setStagedAvailable(true);
           setStagedContent(data.modifiedContent || "");
           setActiveTab("diff");
+          runBuildValidation();
         }
       } else {
         throw new Error(data.error || "Internal Server Error");
@@ -463,6 +494,9 @@ export default function AgentConsolePage() {
             toolCalls: [{ tool: "write_file", target: stagedFile, status: "SUCCESS" }]
           }
         ]);
+        
+        // Validate final applied code compilation
+        runBuildValidation();
       } else {
         throw new Error(writeData.error || "Internal Server Error");
       }
@@ -819,6 +853,71 @@ export default function AgentConsolePage() {
                     </button>
                   )}
                 </div>
+
+                {/* Build Verification Checker Status */}
+                {buildValidationStatus !== "idle" && (
+                  <div className="mb-3 p-3 rounded-xl border flex flex-col gap-1.5 animate-slideDown shrink-0"
+                    style={{
+                      backgroundColor: buildValidationStatus === "checking"
+                        ? "rgba(245, 158, 11, 0.05)"
+                        : buildValidationStatus === "success"
+                          ? "rgba(16, 185, 129, 0.05)"
+                          : "rgba(239, 68, 68, 0.05)",
+                      borderColor: buildValidationStatus === "checking"
+                        ? "rgba(245, 158, 11, 0.2)"
+                        : buildValidationStatus === "success"
+                          ? "rgba(16, 185, 129, 0.2)"
+                          : "rgba(239, 68, 68, 0.2)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5"
+                        style={{
+                          color: buildValidationStatus === "checking"
+                            ? "var(--accent-amber)"
+                            : buildValidationStatus === "success"
+                              ? "var(--accent-emerald)"
+                              : "var(--danger)",
+                        }}
+                      >
+                        {buildValidationStatus === "checking" && (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-amber-500/25 border-t-amber-500 rounded-full animate-spin" />
+                            ⚙️ Build Validation: Checking Workspace...
+                          </>
+                        )}
+                        {buildValidationStatus === "success" && (
+                          <>
+                            <span>✓</span>
+                            ✅ Build Validation: Verification Succeeded
+                          </>
+                        )}
+                        {buildValidationStatus === "failed" && (
+                          <>
+                            <span>✗</span>
+                            ❌ Build Validation: Verification Failed
+                          </>
+                        )}
+                      </span>
+                      {buildValidationStatus === "failed" && (
+                        <span className="text-[9px] text-red-400 font-bold">Errors Found</span>
+                      )}
+                    </div>
+                    
+                    <p className="text-[10px] text-slate-400 leading-normal">
+                      {buildValidationStatus === "checking" && "Executing compiler verify routines ('npm run build') to validate correctness..."}
+                      {buildValidationStatus === "success" && "The workspace compiles successfully with no syntax or compiler warnings!"}
+                      {buildValidationStatus === "failed" && "The modified code introduced compilation issues. See logs below or click Terminal tab for details."}
+                    </p>
+
+                    {buildValidationStatus === "failed" && buildValidationError && (
+                      <div className="mt-2 p-2 bg-black/60 rounded border border-red-500/10 font-mono text-[9px] text-red-300 max-h-24 overflow-y-auto whitespace-pre-wrap">
+                        {buildValidationError}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex-1 mt-3 pt-3 overflow-auto min-h-0 font-mono text-[10px] bg-slate-950/80 rounded-xl border border-slate-850 p-4 relative">
                   {stagedDiff ? (
                     <pre className="text-slate-300 leading-relaxed overflow-x-auto whitespace-pre">

@@ -135,6 +135,11 @@ export default function WorkspaceExplorer() {
   const [userRole, setUserRole] = useState<string>("SuperAdmin");
   const [userName, setUserName] = useState<string>("admin");
 
+  // Sync workspace from remote Git repository states
+  const [locationType, setLocationType] = useState<"local" | "remote" | null>(null);
+  const [isFetchingRemote, setIsFetchingRemote] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   function hasReadAccess(envName: string): boolean {
     const r = userRole.replace(/\s+|_/g, "").toUpperCase();
     if (r === "SUPERADMIN") return true;
@@ -155,12 +160,12 @@ export default function WorkspaceExplorer() {
 
   async function loadTree(environment: string) {
     setEnv(environment);
-    const res = await fetch(`/api/workspaces/${environment}/tree`);
+    const res = await fetch(`/api/workspaces/${environment}/tree?_t=${Date.now()}`, { cache: "no-store" });
     const json = await res.json();
     setTree(json);
 
     try {
-      const stateRes = await fetch(`/api/workspaces/${environment}/state`);
+      const stateRes = await fetch(`/api/workspaces/${environment}/state?_t=${Date.now()}`, { cache: "no-store" });
       if (stateRes.ok) {
         const stateJson = await stateRes.json();
         const arts = stateJson.artifacts ?? [];
@@ -179,7 +184,7 @@ export default function WorkspaceExplorer() {
 
   async function openFile(path: string[]) {
     const full = path.join("/");
-    const res = await fetch(`/api/workspaces/${env}/file/${full}`);
+    const res = await fetch(`/api/workspaces/${env}/file/${full}?_t=${Date.now()}`, { cache: "no-store" });
     const json = await res.json();
     setSelectedFile(full);
     setFileContent(json.content);
@@ -190,6 +195,57 @@ export default function WorkspaceExplorer() {
       ...prev,
       [path]: !prev[path],
     }));
+  }
+
+  async function handleFetchRemote(targetEnv: string) {
+    setIsFetchingRemote(true);
+    setFetchError(null);
+    try {
+      const user = sessionStorage.getItem("envizor_username") || "admin";
+      const userSettingsKey = `envizor_day0_settings_${user.toLowerCase()}`;
+      const cached = localStorage.getItem(userSettingsKey);
+      let s: any = {};
+      if (cached) {
+        s = JSON.parse(cached);
+        // Sync settings with backend API before pulling so paths & strategy are updated
+        await fetch("/api/day0/workspace-settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(s),
+        });
+      } else {
+        const settingsRes = await fetch("/api/day0/workspace-settings");
+        if (settingsRes.ok) {
+          s = await settingsRes.json();
+        }
+      }
+
+      if (s.locationType) {
+        setLocationType(s.locationType);
+      }
+
+      if (s.locationType === "remote" && s.remoteUrl) {
+        const query = new URLSearchParams({
+          locationType: s.locationType,
+          remoteUrl: s.remoteUrl,
+          remoteRepoName: s.remoteRepoName || "",
+          remoteToken: s.remoteToken || ""
+        }).toString();
+        
+        const pullRes = await fetch(`/api/day0/workspace-settings/remote-folders?${query}`);
+        if (!pullRes.ok) {
+          const errData = await pullRes.json();
+          throw new Error(errData.error || "Failed to fetch from remote Git repository.");
+        }
+      }
+      
+      await loadTree(targetEnv);
+    } catch (err: any) {
+      console.error("Fetch remote failed:", err);
+      setFetchError(err.message || "Failed to synchronize remote repository files.");
+    } finally {
+      setIsFetchingRemote(false);
+    }
   }
 
   useEffect(() => {
@@ -222,21 +278,58 @@ export default function WorkspaceExplorer() {
         setOpenFolders(foldersToOpen);
       }
 
-      if (queryEnv && ["DEV", "PRE", "PROD"].includes(queryEnv.toUpperCase())) {
-        const finalEnv = queryEnv.toUpperCase();
-        loadTree(finalEnv);
-        
-        if (changedParam && parsedFiles.length > 0) {
-          dispatchPageContext({
-            page: "explorer",
-            action: "changed_files_loaded",
-            payload: { env: finalEnv, count: parsedFiles.length, changedFiles: parsedFiles }
-          });
+      const finalEnv = (queryEnv && ["DEV", "PRE", "PROD"].includes(queryEnv.toUpperCase()))
+        ? queryEnv.toUpperCase()
+        : "DEV";
+
+      setEnv(finalEnv);
+
+      // Load settings and potentially trigger auto fetch
+      const initSettings = async () => {
+        try {
+          const userSettingsKey = `envizor_day0_settings_${user.toLowerCase()}`;
+          const cached = localStorage.getItem(userSettingsKey);
+          let s: any = null;
+          if (cached) {
+            s = JSON.parse(cached);
+            // Sync user settings with backend API
+            await fetch("/api/day0/workspace-settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(s),
+            });
+          } else {
+            const settingsRes = await fetch("/api/day0/workspace-settings");
+            if (settingsRes.ok) {
+              s = await settingsRes.json();
+            }
+          }
+
+          if (s) {
+            setLocationType(s.locationType || "local");
+            if (s.locationType === "remote") {
+              // Trigger quiet fetch on mount
+              handleFetchRemote(finalEnv);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch settings during mount:", e);
         }
-        return;
+        // Fallback to standard tree load if local or fetch fails
+        loadTree(finalEnv);
+      };
+
+      initSettings();
+
+      if (changedParam && parsedFiles.length > 0) {
+        dispatchPageContext({
+          page: "explorer",
+          action: "changed_files_loaded",
+          payload: { env: finalEnv, count: parsedFiles.length, changedFiles: parsedFiles }
+        });
       }
     }
-    loadTree("DEV");
   }, []);
 
   /* -------------------------------------------------------
@@ -386,6 +479,32 @@ export default function WorkspaceExplorer() {
                 ↩ Back to Baseline Day0
               </button>
 
+              {locationType === "remote" && (
+                <button
+                  type="button"
+                  onClick={() => handleFetchRemote(env)}
+                  disabled={isFetchingRemote}
+                  className="
+                    px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider
+                    bg-sky-600/30 hover:bg-sky-600/40 text-sky-200 border border-sky-500/30
+                    hover:scale-[1.03] active:scale-95 transition-all cursor-pointer
+                    disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5
+                  "
+                  title="Pull latest files from remote Git repository"
+                >
+                  {isFetchingRemote ? (
+                    <>
+                      <span className="animate-spin inline-block">⟳</span>
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <span>☁️</span> Fetch Remote
+                    </>
+                  )}
+                </button>
+              )}
+
               {hasWriteAccess(env) ? (
                 <button
                   onClick={() => {
@@ -415,6 +534,11 @@ export default function WorkspaceExplorer() {
 
 
               <div className="flex items-center gap-3 text-xs text-slate-300">
+                {isFetchingRemote && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-950/40 text-sky-400 border border-sky-500/20 px-3 py-1 font-mono text-[9px] animate-pulse">
+                    <span className="animate-spin text-[8px]">⟳</span> Syncing Git...
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-3 py-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   Live workspace
@@ -426,6 +550,27 @@ export default function WorkspaceExplorer() {
             </div>
           </div>
         </div>
+
+        {/* Git Sync Error Alert Banner */}
+        {fetchError && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 shadow-lg shadow-red-500/5 animate-fadeIn flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl leading-none">⚠️</span>
+              <div>
+                <h4 className="text-sm font-bold text-red-400">Failed to Sync Remote Git Repository</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  {fetchError}. Showing previously cached workspace files.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleFetchRemote(env)}
+              className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all hover:bg-white/5 border-red-500/30 text-red-400 cursor-pointer"
+            >
+              Retry Sync
+            </button>
+          </div>
+        )}
 
         {/* Sync Success Alert Banner */}
         {changedFiles.length > 0 && (

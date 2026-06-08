@@ -257,6 +257,18 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
               >
                 🧠 Agent Console
               </button>
+              <button
+                onClick={() => window.location.href = '/wizard/backend-detail'}
+                className="px-2.5 py-0.5 rounded border border-pink-850 bg-pink-950/20 text-pink-400 hover:bg-pink-900/20 text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer"
+              >
+                📊 Backend Code Detail
+              </button>
+              <button
+                onClick={() => window.location.href = '/wizard/disconnected-onboarding'}
+                className="px-2.5 py-0.5 rounded border border-orange-800 bg-orange-950/20 text-orange-400 hover:bg-orange-900/20 text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer"
+              >
+                🔌 Disconnected Onboarding
+              </button>
             </div>
           )}
         </div>

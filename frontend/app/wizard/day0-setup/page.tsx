@@ -15,6 +15,170 @@ interface EnvStatus {
   loading: boolean;
 }
 
+interface TreeNode {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  children: Record<string, TreeNode>;
+}
+
+function buildFileTree(files: string[]): TreeNode {
+  const root: TreeNode = {
+    name: "",
+    path: "",
+    isFolder: true,
+    children: {},
+  };
+
+  for (const file of files) {
+    const parts = file.split("/");
+    let current = root;
+    let accumulatedPath = "";
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      accumulatedPath = accumulatedPath ? `${accumulatedPath}/${part}` : part;
+      const isLast = i === parts.length - 1;
+
+      if (!current.children[part]) {
+        current.children[part] = {
+          name: part,
+          path: accumulatedPath,
+          isFolder: !isLast,
+          children: {},
+        };
+      }
+      current = current.children[part];
+    }
+  }
+
+  return root;
+}
+
+interface FileTreeNodeProps {
+  node: TreeNode;
+  level: number;
+}
+
+const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, level }) => {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const isProvider = node.name.toLowerCase() === "provider.tf";
+  const isTfvars = node.name.toLowerCase().endsWith(".tfvars");
+  const isBackend = node.name.toLowerCase() === "backend.tf";
+
+  let color = "var(--text-secondary)";
+  let icon = "📄";
+
+  if (node.isFolder) {
+    icon = isOpen ? "📂" : "📁";
+    color = "var(--text-primary)";
+  } else {
+    if (isProvider) {
+      icon = "🔌";
+      color = "#34d399";
+    } else if (isTfvars) {
+      icon = "🔑";
+      color = "#60a5fa";
+    } else if (isBackend) {
+      icon = "🗄️";
+      color = "#f59e0b";
+    }
+  }
+
+  const childNodes = Object.values(node.children);
+  const sortedChildren = [...childNodes].sort((a, b) => {
+    if (a.isFolder && !b.isFolder) return -1;
+    if (!a.isFolder && b.isFolder) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="select-none">
+      <div 
+        className={`flex items-center gap-1.5 py-0.5 px-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[10px] font-mono`}
+        style={{ 
+          paddingLeft: `${level * 12 + 4}px`,
+          color: color
+        }}
+        onClick={() => node.isFolder && setIsOpen(!isOpen)}
+      >
+        {node.isFolder && (
+          <span className="text-[8px] text-slate-500 w-3 text-center">
+            {isOpen ? "▼" : "▶"}
+          </span>
+        )}
+        {!node.isFolder && <span className="w-3" />}
+        <span className="text-[9px]">{icon}</span>
+        <span className="truncate">{node.name}</span>
+      </div>
+      
+      {node.isFolder && isOpen && sortedChildren.length > 0 && (
+        <div className="relative">
+          {/* Vertical line guide for nested children */}
+          <div 
+            className="absolute left-[5px] top-0 bottom-1 w-[1px]"
+            style={{ left: `${level * 12 + 10}px`, backgroundColor: "var(--border)" }}
+          />
+          <div>
+            {sortedChildren.map((child, idx) => (
+              <FileTreeNode key={idx} node={child} level={level + 1} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FileTree: React.FC<{ files: string[] }> = ({ files }) => {
+  const treeRoot = buildFileTree(files);
+  const sortedChildren = Object.values(treeRoot.children).sort((a, b) => {
+    if (a.isFolder && !b.isFolder) return -1;
+    if (!a.isFolder && b.isFolder) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="space-y-0.5 py-1">
+      {sortedChildren.map((child, idx) => (
+        <FileTreeNode key={idx} node={child} level={0} />
+      ))}
+    </div>
+  );
+};
+
+const SAVIYNT_GET_APIS = [
+  { name: "🔑 Authentication Token Fetch Only", path: "auth_only" },
+  { name: "👤 Get List of Users", path: "ECM/api/v5/user" },
+  { name: "📁 Get List of Security Systems", path: "ECM/api/v5/getSecuritySystems" },
+  { name: "💻 Get List of Endpoints", path: "ECM/api/v5/getEndpoints" },
+  { name: "👥 Get List of Roles", path: "ECM/api/v5/getRoles" },
+  { name: "⚙️ Get List of Entitlements", path: "ECM/api/v5/getEntitlements" },
+  { name: "🔍 Get Flat Response Entitlement Details For User", path: "ECM/api/v5/getEntDetailsforUsers" },
+  { name: "🔍 Get Flat Response Role Details For User", path: "ECM/api/v5/getRoleDetailsforUsers" },
+  { name: "🛡️ Get SavRoles", path: "ECM/api/v5/getSavRoles" },
+  { name: "🌿 Get Child Entitlements", path: "ECM/api/v5/getChildEntitlements" },
+  { name: "🏷️ Get List of Entitlement Types", path: "ECM/api/v5/getEntitlementTypes" },
+  { name: "📝 Fetch Dynamic Attributes", path: "ECM/api/v5/fetchDynamicAttribute" },
+  { name: "🏢 Get Organization", path: "ECM/api/v5/getOrganization" },
+  { name: "👑 GET All SAV Roles", path: "ECMv6/api/userms/savroles" },
+  { name: "👑 GET Users Associated with SAV Role", path: "ECMv6/api/userms/savroles/SAV_Role_Name/users" },
+  { name: "📊 getDatasetValues", path: "ECM/api/v5/getDatasetValues" },
+  { name: "📈 Fetch List of Analytics ES", path: "ECM/api/v5/fetchControlListES" },
+  { name: "📉 Fetch Analytics Details ES", path: "ECM/api/v5/fetchControlDetailsES" },
+  { name: "🙋 Get Requestable Users", path: "ECM/api/v5/getrequestableusers" },
+  { name: "🤝 Get Delegate User List", path: "ECM/api/v5/getDelegateUserList" },
+  { name: "⚠️ List of Risks", path: "ECM/api/v5/risks" },
+  { name: "🔧 Resume All Jobs", path: "ECM/api/v5/jobs/resume-all" },
+  { name: "🔑 Get KeyStore Details", path: "ECM/api/v5/getKeyStoreCertificateDetails" },
+  { name: "📖 Get User (LDAP)", path: "api/v2/getUser" },
+  { name: "❓ Fetch User Questions (LDAP)", path: "api/v2/fetchUserQuestions" },
+  { name: "📦 Transport Status", path: "api/v5/transportPackageStatus" },
+  { name: "📋 Fetch Technical Rules", path: "ECM/api/v5/rules/technical" },
+  { name: "📋 Fetch User Update Rules", path: "ECM/api/v5/rules/userUpdate" }
+];
+
 export default function Day0SetupPage() {
   const [activeGuideTab, setActiveGuideTab] = useState<"flow" | "workspaces" | "tenants" | "commands">("flow");
   const [selectedEnvTab, setSelectedEnvTab] = useState<"DEV" | "PRE" | "PROD">("DEV");
@@ -38,6 +202,416 @@ export default function Day0SetupPage() {
   const [remoteToken, setRemoteToken] = useState("");
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // ── Saviynt Tenant Credentials state ───────────────────────────────────────
+  type CredEnv = "DEV" | "PRE" | "PROD";
+  const [credTab, setCredTab] = useState<CredEnv>("DEV");
+  const [creds, setCreds] = useState<Record<CredEnv, { url: string; username: string; password: string }>>({ 
+    DEV:  { url: "", username: "", password: "" },
+    PRE:  { url: "", username: "", password: "" },
+    PROD: { url: "", username: "", password: "" },
+  });
+  const [showPwd, setShowPwd] = useState<Record<CredEnv, boolean>>({ DEV: false, PRE: false, PROD: false });
+  const [workspaceRoot, setWorkspaceRoot] = useState("");
+  const [githubToken, setGithubToken] = useState("");
+  const [showGhToken, setShowGhToken] = useState(false);
+  const [credLoading, setCredLoading] = useState(false);
+  const [credMsg, setCredMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [credFileExists, setCredFileExists] = useState(false);
+
+  const [selectedTestApi, setSelectedTestApi] = useState<string>("auth_only");
+  const [testApiLoading, setTestApiLoading] = useState<boolean>(false);
+  const [testApiResponse, setTestApiResponse] = useState<any>(null);
+  const [responseFormat, setResponseFormat] = useState<"json" | "table" | "cards">("json");
+
+  // .env.local inspector states
+  const [showEnvInspector, setShowEnvInspector] = useState(false);
+  const [envFileContent, setEnvFileContent] = useState("");
+  const [envFilePath, setEnvFilePath] = useState("");
+  const [envInspectorLoading, setEnvInspectorLoading] = useState(false);
+
+  const handleFetchRawEnv = async () => {
+    if (showEnvInspector) {
+      setShowEnvInspector(false);
+      return;
+    }
+    setEnvInspectorLoading(true);
+    try {
+      const res = await fetch("/api/day0/tenant-credentials/raw");
+      if (res.ok) {
+        const data = await res.json();
+        setEnvFileContent(data.content || "# No content or file doesn't exist");
+        setEnvFilePath(data.filePath || ".env.local");
+        setShowEnvInspector(true);
+      } else {
+        console.error("Failed to fetch raw env file content");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setEnvInspectorLoading(false);
+    }
+  };
+
+  // Load tenant credentials on mount
+  useEffect(() => {
+    const fetchCredentials = async () => {
+      try {
+        const res = await fetch("/api/day0/tenant-credentials");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.credentials) {
+            const c = data.credentials;
+            setCreds({
+              DEV:  { url: c.SAVIYNT_DEV_URL  || "", username: c.SAVIYNT_DEV_USERNAME  || "", password: c.SAVIYNT_DEV_PASSWORD  || "" },
+              PRE:  { url: c.SAVIYNT_PRE_URL  || "", username: c.SAVIYNT_PRE_USERNAME  || "", password: c.SAVIYNT_PRE_PASSWORD  || "" },
+              PROD: { url: c.SAVIYNT_PROD_URL || "", username: c.SAVIYNT_PROD_USERNAME || "", password: c.SAVIYNT_PROD_PASSWORD || "" },
+            });
+            setWorkspaceRoot(c.WORKSPACE_ROOT || "");
+            setGithubToken(c.GITHUB_TOKEN || "");
+            if (c.WORKSPACE_ROOT) {
+              setLocalPath(prev => prev || c.WORKSPACE_ROOT);
+            }
+            if (c.GITHUB_TOKEN) {
+              setRemoteToken(prev => prev || c.GITHUB_TOKEN);
+            }
+            setCredFileExists(data.fileExists);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch credentials on mount:", err);
+      }
+    };
+    fetchCredentials();
+  }, []);
+
+  const getResourceList = (response: any) => {
+    if (!response) return null;
+    if (response.securitysystems) return { type: "Security System", data: response.securitysystems };
+    if (response.endpoints) return { type: "Endpoint", data: response.endpoints };
+    if (response.roles) return { type: "Role", data: response.roles };
+    if (response.entitlements) return { type: "Entitlement", data: response.entitlements };
+    
+    if (response.securitySystems) return { type: "Security System", data: response.securitySystems };
+    
+    for (const key of Object.keys(response)) {
+      if (Array.isArray(response[key])) {
+        return { type: key.replace(/s$/, "").replace(/([A-Z])/g, " $1"), data: response[key] };
+      }
+    }
+    return null;
+  };
+
+  const renderResponseTable = (response: any) => {
+    const resource = getResourceList(response);
+    if (!resource || !resource.data || resource.data.length === 0) {
+      const entries = Object.entries(response);
+      if (entries.length === 0) {
+        return (
+          <div className="text-[10px] text-slate-400 italic py-3 text-center">
+            No properties to display in table.
+          </div>
+        );
+      }
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[11px] text-slate-300 border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                <th className="py-2 pr-4 pl-2">Property</th>
+                <th className="py-2 pr-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(([key, val]) => (
+                <tr key={key} className="border-b border-slate-900/50 hover:bg-slate-900/30">
+                  <td className="py-2 px-2 font-mono text-pink-400">{key}</td>
+                  <td className="py-2 px-2 font-mono text-slate-200">
+                    {val === null || val === undefined ? (
+                      <span className="text-slate-600">-</span>
+                    ) : typeof val === "object" ? (
+                      <pre className="text-[9.5px] font-mono text-slate-300 bg-slate-950 p-2 rounded border border-slate-900/50 max-h-[100px] overflow-y-auto whitespace-pre-wrap select-text select-all block">
+                        {JSON.stringify(val, null, 2)}
+                      </pre>
+                    ) : (
+                      String(val)
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    const allKeys = Array.from(
+      new Set(resource.data.flatMap((item: any) => Object.keys(item)))
+    ).filter(k => typeof k === "string");
+
+    return (
+      <div className="overflow-x-auto rounded-xl border border-slate-900 bg-slate-950/45">
+        <table className="w-full text-left text-[11px] text-slate-300 border-collapse">
+          <thead>
+            <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+              {allKeys.map(key => (
+                <th key={key} className="py-2 px-3">
+                  {key.replace(/([A-Z])/g, " $1")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {resource.data.map((item: any, idx: number) => (
+              <tr key={idx} className="border-b border-slate-900 hover:bg-slate-900/30 transition-colors">
+                {allKeys.map(key => (
+                  <td 
+                    key={key} 
+                    className="py-2 px-3 font-mono max-w-[200px] truncate text-slate-200" 
+                    title={typeof item[key] === "object" ? JSON.stringify(item[key], null, 2) : String(item[key] ?? "")}
+                  >
+                    {item[key] === null || item[key] === undefined ? (
+                      <span className="text-slate-600">-</span>
+                    ) : typeof item[key] === "object" ? (
+                      <span className="text-pink-400 bg-pink-950/20 px-1 py-0.5 rounded text-[9px] font-bold">
+                        {Array.isArray(item[key]) ? `Array(${item[key].length})` : "Object"}
+                      </span>
+                    ) : (
+                      String(item[key])
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderResponseCards = (response: any) => {
+    const resource = getResourceList(response);
+    if (!resource || !resource.data || resource.data.length === 0) {
+      const entries = Object.entries(response);
+      if (entries.length === 0) {
+        return (
+          <div className="text-[10px] text-slate-400 italic py-3 text-center">
+            No properties to display as cards.
+          </div>
+        );
+      }
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+          {entries.map(([key, val]) => (
+            <div key={key} className="bg-slate-900/40 border border-slate-800/80 p-3 rounded-xl flex flex-col gap-1">
+              <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">{key.replace(/([A-Z])/g, " $1")}</span>
+              <div className="text-xs font-mono text-pink-400 break-words mt-0.5">
+                {val === null || val === undefined ? (
+                  <span className="text-slate-650">-</span>
+                ) : typeof val === "object" ? (
+                  <pre className="text-[9.5px] font-mono text-slate-350 bg-slate-950 p-2 rounded border border-slate-900 max-h-[120px] overflow-y-auto whitespace-pre-wrap select-text select-all block mt-1">
+                    {JSON.stringify(val, null, 2)}
+                  </pre>
+                ) : (
+                  String(val)
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+        {resource.data.map((item: any, idx: number) => {
+          const title = item.name || item.displayName || item.id || `Item ${idx + 1}`;
+          const id = item.id || item.code || "";
+          const desc = item.description || item.descriptionVal || item.entitlement_value || "";
+          const extraProps = Object.entries(item).filter(([k, _]) => k !== "name" && k !== "displayName" && k !== "id" && k !== "code" && k !== "description" && k !== "descriptionVal");
+
+          return (
+            <div key={idx} className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-850 p-4 rounded-xl space-y-2 hover:border-pink-500/30 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-xs font-bold text-slate-100 truncate">{title}</div>
+                  {id && (
+                    <div className="text-[9px] font-mono text-slate-500">ID: {id}</div>
+                  )}
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded tracking-wide shrink-0">
+                  {resource.type}
+                </span>
+              </div>
+              
+              {desc && (
+                <p className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/50 p-2 rounded-lg border border-slate-900/20 italic">
+                  {desc}
+                </p>
+              )}
+
+              {extraProps.length > 0 && (
+                <div className="border-t border-slate-900/60 pt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[9px]">
+                  {extraProps.map(([k, v]) => (
+                    <div key={k} className="flex flex-col truncate">
+                      <span className="text-slate-500 uppercase font-semibold text-[8px] tracking-wider">{k.replace(/([A-Z])/g, " $1")}</span>
+                      {typeof v === "object" ? (
+                        <span 
+                          className="font-mono text-pink-400 truncate cursor-help border-b border-pink-550/20 w-fit"
+                          title={JSON.stringify(v, null, 2)}
+                        >
+                          {Array.isArray(v) ? `Array(${v.length})` : "Object"}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-slate-300 truncate" title={String(v)}>
+                          {String(v)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const [healthRefreshing, setHealthRefreshing] = useState(false);
+
+  const handleRefreshHealth = async () => {
+    setHealthRefreshing(true);
+    setEnvStatus((prev) => ({
+      DEV: { ...prev.DEV, loading: true },
+      PRE: { ...prev.PRE, loading: true },
+      PROD: { ...prev.PROD, loading: true },
+    }));
+
+    try {
+      if (locationType === "remote") {
+        const query = new URLSearchParams({
+          locationType,
+          remoteUrl,
+          remoteRepoName,
+          remoteToken
+        }).toString();
+        await fetch(`/api/day0/workspace-settings/remote-folders?${query}`);
+      }
+      await scanEnvironments();
+    } catch (err) {
+      console.error("Refresh failed:", err);
+    } finally {
+      setHealthRefreshing(false);
+    }
+  };
+
+  const handleTestApi = async () => {
+    const activeCreds = creds[credTab];
+    if (!activeCreds.url?.trim()) {
+      setTestApiResponse({
+        success: false,
+        error: "Please enter a valid Saviynt Tenant URL in the fields above before testing.",
+        reachable: false
+      });
+      return;
+    }
+    setTestApiLoading(true);
+    setTestApiResponse(null);
+    try {
+      const payload = {
+        env: credTab,
+        url: activeCreds.url,
+        username: activeCreds.username,
+        password: activeCreds.password,
+        apiPath: selectedTestApi
+      };
+
+      const res = await fetch("/api/day0/tenant-credentials/test-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "API test request failed");
+      }
+
+      const data = await res.json();
+      setTestApiResponse(data);
+    } catch (err: any) {
+      setTestApiResponse({
+        success: false,
+        error: err.message || "An unexpected error occurred during API testing."
+      });
+    } finally {
+      setTestApiLoading(false);
+    }
+  };
+
+  // ── Local workspace file explorer state ────────────────────────────────────
+  type EnvFiles = { env: string; files: string[]; exists: boolean };
+  const [localWorkspaceData, setLocalWorkspaceData] = useState<EnvFiles[]>([]);
+  const [localScanLoading, setLocalScanLoading] = useState(false);
+  const [remotePullLoading, setRemotePullLoading] = useState(false);
+  const [localScanError, setLocalScanError] = useState<string | null>(null);
+  const [expandedEnv, setExpandedEnv] = useState<string | null>("DEV");
+
+  const scanLocalWorkspace = async () => {
+    setLocalScanLoading(true);
+    setLocalScanError(null);
+    const envs = ["DEV", "PRE", "PROD"];
+    const results: EnvFiles[] = [];
+    try {
+      for (const env of envs) {
+        try {
+          const res = await fetch(`/api/env/${env}`);
+          if (res.status === 404) {
+            results.push({ env, files: [], exists: false });
+          } else {
+            const data = await res.json();
+            results.push({ env, files: data.files ?? [], exists: true });
+          }
+        } catch {
+          results.push({ env, files: [], exists: false });
+        }
+      }
+      setLocalWorkspaceData(results);
+    } catch (err: any) {
+      console.error(err);
+      setLocalScanError(err.message || "An unexpected error occurred while scanning workspace.");
+    } finally {
+      setLocalScanLoading(false);
+    }
+  };
+
+  const fetchRemoteWorkspace = async () => {
+    setRemotePullLoading(true);
+    setLocalScanError(null);
+    try {
+      const query = new URLSearchParams({
+        locationType,
+        remoteUrl,
+        remoteRepoName,
+        remoteToken
+      }).toString();
+      const pullRes = await fetch(`/api/day0/workspace-settings/remote-folders?${query}`);
+      if (!pullRes.ok) {
+        const errData = await pullRes.json();
+        throw new Error(errData.error || "Failed to fetch from remote Git repository.");
+      }
+      // After successfully pulling remote files, scan local workspace and update environment health
+      await scanLocalWorkspace();
+      await scanEnvironments();
+    } catch (err: any) {
+      console.error(err);
+      setLocalScanError(err.message || "An unexpected error occurred while fetching remote repository.");
+    } finally {
+      setRemotePullLoading(false);
+    }
+  };
+
 
   // User privileges & session states
   const [userRole, setUserRole] = useState<string>("BasicUser");
@@ -431,6 +1005,18 @@ export default function Day0SetupPage() {
         throw new Error(errData.error || "Failed to save settings");
       }
 
+      // Also write WORKSPACE_ROOT and GITHUB_TOKEN to .env.local
+      const envPayload: Record<string, string> = {
+        WORKSPACE_ROOT: localPath,
+        GITHUB_TOKEN: remoteToken,
+      };
+
+      await fetch("/api/day0/tenant-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(envPayload),
+      });
+
       // Save uniquely in localStorage for this user
       const userSettingsKey = `envizor_day0_settings_${userName.toLowerCase()}`;
       localStorage.setItem(userSettingsKey, JSON.stringify(payload));
@@ -627,25 +1213,134 @@ export default function Day0SetupPage() {
               {/* Conditional Fields */}
               <div className="grid md:grid-cols-2 gap-4">
                 {locationType === "local" ? (
-                  <div className="col-span-2 space-y-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: "var(--text-secondary)" }}>
-                      Target Local Path
-                    </label>
-                    <input
-                      type="text"
-                      value={localPath}
-                      onChange={(e) => setLocalPath(e.target.value)}
-                      placeholder="/Users/tejov/Documents/IGA-Saviynt"
-                      className="w-full px-4 py-3 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      style={{
-                        backgroundColor: "var(--bg-panel)",
-                        borderColor: "var(--border)",
-                        color: "var(--text-primary)",
-                      }}
-                    />
-                    <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
-                      Envizor will create DEV, PRE, and PROD folders recursively inside this location.
-                    </p>
+                  <div className="col-span-2 space-y-4">
+                    {/* Path input row */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: "var(--text-secondary)" }}>
+                        Target Local Path
+                      </label>
+                      <div className="flex gap-2 items-start">
+                        <input
+                          type="text"
+                          value={localPath}
+                          onChange={(e) => {
+                            setLocalPath(e.target.value);
+                            setWorkspaceRoot(e.target.value);
+                          }}
+                          placeholder="/Users/tejov/Documents/IGA-Saviynt"
+                          className="flex-1 px-4 py-3 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                          style={{
+                            backgroundColor: "var(--bg-panel)",
+                            borderColor: "var(--border)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={scanLocalWorkspace}
+                          disabled={localScanLoading}
+                          className="shrink-0 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                          style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--accent)" }}
+                        >
+                          {localScanLoading ? (
+                            <span className="animate-spin inline-block">⟳</span>
+                          ) : "🔍"}
+                          {localScanLoading ? "Scanning..." : "Scan"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
+                        Envizor will create DEV, PRE, and PROD folders recursively inside this location.
+                      </p>
+                    </div>
+
+                    {/* Live workspace file tree */}
+                    {localScanError && (
+                      <p className="text-[11px] text-red-400 bg-red-950/30 border border-red-500/20 rounded-xl px-3 py-2">
+                        ❌ {localScanError}
+                      </p>
+                    )}
+
+                    {localWorkspaceData.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-extrabold uppercase tracking-widest mb-1" style={{ color: "var(--accent)" }}>
+                          📁 Local Workspace Contents — <code className="font-mono lowercase normal-case">{localPath}</code>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {localWorkspaceData.map(({ env, files, exists }) => {
+                            const tfFiles = files.filter(f => f.endsWith(".tf") || f.endsWith(".tfvars"));
+                            const hasProvider = files.some(f => f.toLowerCase() === "provider.tf");
+                            const hasVars = files.some(f => f.toLowerCase().endsWith(".tfvars"));
+                            const isExpanded = expandedEnv === env;
+                            const envColors: Record<string, string> = { DEV: "#38bdf8", PRE: "#a78bfa", PROD: "#f472b6" };
+                            return (
+                              <div
+                                key={env}
+                                className="rounded-xl border overflow-hidden transition-all"
+                                style={{ borderColor: exists ? envColors[env] + "40" : "var(--border)", backgroundColor: "var(--bg-panel)" }}
+                              >
+                                {/* Env header */}
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedEnv(isExpanded ? null : env)}
+                                  className="w-full flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full"
+                                      style={{ backgroundColor: envColors[env] + "20", color: envColors[env] }}
+                                    >
+                                      {env}
+                                    </span>
+                                    {exists ? (
+                                      <span className="text-[10px] text-slate-400">{tfFiles.length} file{tfFiles.length !== 1 ? "s" : ""}</span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-600">not created</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {hasProvider && <span title="provider.tf" className="text-[9px] text-emerald-400 font-bold">P</span>}
+                                    {hasVars && <span title=".tfvars" className="text-[9px] text-sky-400 font-bold">V</span>}
+                                    <span className="text-slate-500 text-[10px]">{isExpanded ? "▲" : "▼"}</span>
+                                  </div>
+                                </button>
+
+                                {/* File list */}
+                                {isExpanded && (
+                                  <div className="border-t px-3 py-2 space-y-0.5 max-h-48 overflow-y-auto" style={{ borderColor: "var(--border)" }}>
+                                    {!exists ? (
+                                      <p className="text-[10px] text-slate-600 italic py-1">Folder does not exist yet.</p>
+                                    ) : files.length === 0 ? (
+                                      <p className="text-[10px] text-slate-600 italic py-1">Empty folder.</p>
+                                    ) : (
+                                      <FileTree files={files} />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex gap-4 text-[9px] text-slate-500">
+                          <span>🔌 <code>provider.tf</code></span>
+                          <span>🔑 <code>.tfvars</code></span>
+                          <span>🗄️ <code>backend.tf</code></span>
+                          <span>📄 other <code>.tf</code></span>
+                        </div>
+                      </div>
+                    )}
+
+                    {localWorkspaceData.length === 0 && !localScanLoading && (
+                      <div
+                        className="text-center py-6 rounded-xl border border-dashed text-[11px] cursor-pointer hover:bg-white/5 transition-colors"
+                        style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                        onClick={scanLocalWorkspace}
+                      >
+                        <div className="text-2xl mb-1">📂</div>
+                        Click <strong>Scan</strong> or here to inspect your local workspace contents
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -692,7 +1387,10 @@ export default function Day0SetupPage() {
                       <input
                         type="password"
                         value={remoteToken}
-                        onChange={(e) => setRemoteToken(e.target.value)}
+                        onChange={(e) => {
+                          setRemoteToken(e.target.value);
+                          setGithubToken(e.target.value);
+                        }}
                         placeholder="ghp_xxxxxxxxxxxx"
                         className="w-full px-4 py-3 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                         style={{
@@ -704,6 +1402,164 @@ export default function Day0SetupPage() {
                       <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
                         Used securely to clone and push updates to your GitOps repository. Masked for security.
                       </p>
+                    </div>
+
+                    {/* Remote Scan row */}
+                    <div className="col-span-2 space-y-4 pt-2">
+                      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between border-t pt-4" style={{ borderColor: "var(--border)" }}>
+                        <div className="space-y-0.5 max-w-xl">
+                          <label className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: "var(--text-secondary)" }}>
+                            Remote Repository Workspace Contents
+                          </label>
+                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            Scan Cache checks the locally cached files tree instantly. Fetch Remote queries the remote Git repository to pull down any new files and sync your workspace.
+                          </p>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={scanLocalWorkspace}
+                            disabled={localScanLoading || remotePullLoading}
+                            className="flex-1 sm:flex-initial px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                            title="Scan cached repository files on the server"
+                          >
+                            {localScanLoading ? (
+                              <span className="animate-spin inline-block">⟳</span>
+                            ) : "🔍"}
+                            {localScanLoading ? "Scanning..." : "Scan Cache"}
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={fetchRemoteWorkspace}
+                            disabled={localScanLoading || remotePullLoading}
+                            className="flex-1 sm:flex-initial px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            style={{ 
+                              backgroundColor: "var(--bg-panel)", 
+                              borderColor: "var(--accent)", 
+                              color: "var(--accent)",
+                              boxShadow: remotePullLoading ? "0 0 10px rgba(56, 189, 248, 0.2)" : "none"
+                            }}
+                            title="Pull latest updates from remote Git repository"
+                          >
+                            {remotePullLoading ? (
+                              <span className="animate-spin inline-block">⟳</span>
+                            ) : "☁️"}
+                            {remotePullLoading ? "Fetching..." : "Fetch Remote"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Live workspace file tree for remote */}
+                      {localScanError && (
+                        <p className="text-[11px] text-red-400 bg-red-950/30 border border-red-500/20 rounded-xl px-3 py-2">
+                          ❌ {localScanError}
+                        </p>
+                      )}
+
+                      {localWorkspaceData.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-extrabold uppercase tracking-widest mb-1" style={{ color: "var(--accent)" }}>
+                            📁 Remote Repository Contents — <code className="font-mono lowercase normal-case">{remoteRepoName || "remote-git"}</code>
+                          </div>
+                          
+                          {/* Folder cards */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {localWorkspaceData.map(({ env, files, exists }) => {
+                              const tfFiles = files.filter(f => f.endsWith(".tf") || f.endsWith(".tfvars"));
+                              const hasProvider = files.some(f => f.toLowerCase() === "provider.tf");
+                              const hasVars = files.some(f => f.toLowerCase().endsWith(".tfvars"));
+                              const isExpanded = expandedEnv === env;
+                              const envColors: Record<string, string> = { DEV: "#38bdf8", PRE: "#a78bfa", PROD: "#f472b6" };
+                              return (
+                                <div
+                                  key={env}
+                                  className="rounded-xl border overflow-hidden transition-all"
+                                  style={{ borderColor: exists ? envColors[env] + "40" : "var(--border)", backgroundColor: "var(--bg-panel)" }}
+                                >
+                                  {/* Env header */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedEnv(isExpanded ? null : env)}
+                                    className="w-full flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full"
+                                        style={{ backgroundColor: envColors[env] + "20", color: envColors[env] }}
+                                      >
+                                        {env}
+                                      </span>
+                                      {exists ? (
+                                        <span className="text-[10px] text-slate-400">{tfFiles.length} file{tfFiles.length !== 1 ? "s" : ""}</span>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-600">not created</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      {hasProvider && <span title="provider.tf" className="text-[9px] text-emerald-400 font-bold">P</span>}
+                                      {hasVars    && <span title=".tfvars" className="text-[9px] text-sky-400 font-bold">V</span>}
+                                      <span className="text-slate-500 text-[10px]">{isExpanded ? "▲" : "▼"}</span>
+                                    </div>
+                                  </button>
+
+                                  {/* File list */}
+                                  {isExpanded && (
+                                    <div className="border-t px-3 py-2 space-y-0.5 max-h-48 overflow-y-auto" style={{ borderColor: "var(--border)" }}>
+                                      {!exists ? (
+                                        <p className="text-[10px] text-slate-600 italic py-1">Folder does not exist yet on remote.</p>
+                                      ) : files.length === 0 ? (
+                                        <p className="text-[10px] text-slate-600 italic py-1">Empty folder on remote.</p>
+                                      ) : (
+                                        <FileTree files={files} />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          {/* Legend */}
+                          <div className="flex gap-4 text-[9px] text-slate-500">
+                            <span>🔌 <code>provider.tf</code></span>
+                            <span>🔑 <code>.tfvars</code></span>
+                            <span>🗄️ <code>backend.tf</code></span>
+                            <span>📄 other <code>.tf</code></span>
+                          </div>
+                        </div>
+                      )}
+
+                      {localWorkspaceData.length === 0 && !localScanLoading && !remotePullLoading && (
+                        <div
+                          className="flex flex-col items-center justify-center text-center py-8 rounded-xl border border-dashed text-[11px]"
+                          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                        >
+                          <div className="text-3xl mb-2">☁️</div>
+                          <div className="mb-3 max-w-xs">
+                            No remote workspace information scanned yet. Run a fast check on your cache or pull fresh data from Git.
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={scanLocalWorkspace}
+                              className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all hover:bg-white/5 cursor-pointer"
+                              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                            >
+                              Scan Cache
+                            </button>
+                            <button
+                              type="button"
+                              onClick={fetchRemoteWorkspace}
+                              className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all hover:bg-white/5 cursor-pointer"
+                              style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                            >
+                              Fetch Remote
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -761,6 +1617,314 @@ export default function Day0SetupPage() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+
+        {/* ── SAVIYNT TENANT CREDENTIALS PANEL ─────────────────────────────────── */}
+
+        <div
+          className="rounded-2xl border p-6 shadow-xl relative overflow-hidden transition-colors duration-300 backdrop-blur-md animate-fadeIn"
+          style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border)" }}
+        >
+          <div className="absolute top-0 right-0 w-80 h-80 rounded-full blur-[100px] opacity-10 pointer-events-none"
+               style={{ background: "radial-gradient(circle, #ec4899 0%, transparent 70%)" }} />
+
+          <div className="flex flex-col gap-5">
+            {/* Header */}
+            <div className="space-y-1">
+              <div className="text-[10px] font-extrabold uppercase tracking-widest text-pink-400">
+                Tenant Connectivity
+              </div>
+              <h3 className="text-base font-bold flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <span>🔑</span> Saviynt Tenant Credentials
+              </h3>
+              <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                Set your tenant URL and credentials for each environment. Saved securely to
+                <code className="mx-1 px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-pink-300 font-mono">frontend/.env.local</code>
+                on the server — never exposed to the browser.
+                {credFileExists
+                  ? <span className="ml-1 text-emerald-400 font-semibold">✅ File exists</span>
+                  : <span className="ml-1 text-amber-400 font-semibold">⚠️ File will be created on first save</span>
+                }
+              </p>
+            </div>
+
+            {/* Vercel notice */}
+            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-950/20 text-[10.5px] text-amber-300 leading-relaxed">
+              <strong>🚀 Vercel deployment:</strong> On Vercel, environment variables cannot be written to disk. Set these same values as <strong>Environment Variables</strong> in your Vercel project dashboard (Settings → Environment Variables) using the exact key names shown in each field label.
+            </div>
+
+            {/* Env tabs */}
+            <div className="flex gap-2 border-b pb-1" style={{ borderColor: "var(--border)" }}>
+              {(["DEV", "PRE", "PROD"] as CredEnv[]).map(env => {
+                const filled = !!(creds[env].url && creds[env].username);
+                return (
+                  <button
+                    key={env}
+                    onClick={() => setCredTab(env)}
+                    className={`px-4 py-1.5 rounded-t-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-b-2 flex items-center gap-1.5 ${
+                      credTab === env
+                        ? "border-pink-500 text-pink-400"
+                        : "border-transparent text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    {filled
+                      ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                      : <span className="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block" />
+                    }
+                    {env}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Per-env fields */}
+            {(["DEV", "PRE", "PROD"] as CredEnv[]).map(env => (
+              <div key={env} className={credTab === env ? "" : "hidden"}>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {/* URL */}
+                  <div className="md:col-span-3 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
+                      <code className="text-pink-400">SAVIYNT_{env}_URL</code>
+                    </label>
+                    <input
+                      type="url"
+                      value={creds[env].url}
+                      onChange={e => setCreds(prev => ({ ...prev, [env]: { ...prev[env], url: e.target.value } }))}
+                      placeholder={`https://${env.toLowerCase()}-tenant.saviyntcloud.com`}
+                      className="w-full px-4 py-3 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-pink-500/50"
+                      style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                    />
+                  </div>
+                  {/* Username */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
+                      <code className="text-sky-400">SAVIYNT_{env}_USERNAME</code>
+                    </label>
+                    <input
+                      type="text"
+                      value={creds[env].username}
+                      onChange={e => setCreds(prev => ({ ...prev, [env]: { ...prev[env], username: e.target.value } }))}
+                      placeholder="admin"
+                      className="w-full px-4 py-3 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                      style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                    />
+                  </div>
+                  {/* Password */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
+                      <code className="text-violet-400">SAVIYNT_{env}_PASSWORD</code>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPwd[env] ? "text" : "password"}
+                        value={creds[env].password}
+                        onChange={e => setCreds(prev => ({ ...prev, [env]: { ...prev[env], password: e.target.value } }))}
+                        placeholder={creds[env].password === "••••••••" ? "Already set — type to change" : "Your password"}
+                        className="w-full px-4 py-3 pr-12 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd(p => ({ ...p, [env]: !p[env] }))}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer text-[11px]"
+                        title={showPwd[env] ? "Hide" : "Reveal"}
+                      >
+                        {showPwd[env] ? "🙈" : "👁️"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Shared fields: WORKSPACE_ROOT shown conditionally */}
+            {locationType === "local" && (
+              <div className="border-t pt-5 grid grid-cols-1 gap-4 animate-fadeIn" style={{ borderColor: "var(--border)" }}>
+                <div className="space-y-1.5 animate-fadeIn">
+                  <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
+                    <code className="text-emerald-400">WORKSPACE_ROOT</code>
+                  </label>
+                  <input
+                    type="text"
+                    value={workspaceRoot}
+                    onChange={e => {
+                      setWorkspaceRoot(e.target.value);
+                      setLocalPath(e.target.value);
+                    }}
+                    placeholder="/absolute/path/to/iga-terraform-workspace"
+                    className="w-full px-4 py-3 rounded-xl text-xs font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                  />
+                  <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
+                    Absolute path where generated .tf files are written. Overrides workspace_settings.json.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 🔑 API Connection Tester Widget */}
+            <div className="border-t pt-5 space-y-3 animate-fadeIn" style={{ borderColor: "var(--border)" }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🔑</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-pink-400">
+                    Verify Credentials & Test Connectivity
+                  </span>
+                </div>
+
+                {/* Inspector Trigger Button */}
+                <button
+                  type="button"
+                  disabled={envInspectorLoading}
+                  onClick={handleFetchRawEnv}
+                  className="px-3 py-1.5 rounded-lg border text-[9.5px] font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 hover:bg-slate-900 border-slate-800 text-slate-400"
+                >
+                  {envInspectorLoading ? "⏳ Loading..." : "🔍 Inspect Stored .env.local"}
+                </button>
+              </div>
+
+              <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                Verify if your Saviynt {credTab} tenant is reachable. This will authenticate using the credentials specified above and retrieve a Bearer token.
+              </p>
+
+              <button
+                type="button"
+                disabled={testApiLoading}
+                onClick={handleTestApi}
+                className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white text-[10px] font-bold uppercase rounded-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shrink-0 h-fit"
+              >
+                {testApiLoading ? "🔑 Connecting..." : "🔑 Test Connection & Fetch Bearer Token"}
+              </button>
+
+              {/* Redirection Link to Explorer */}
+              <div className="p-3 bg-slate-950/65 rounded-xl border border-slate-900 text-[10.5px] text-slate-400 leading-relaxed">
+                <span>👉 Need to test specific resource APIs or inspect response payloads? Go to the </span>
+                <Link href="/wizard/day0/api-usage" className="text-pink-400 hover:underline font-bold">
+                  Saviynt API Workspace Explorer & Playground
+                </Link>
+              </div>
+
+              {/* Stored Env Inspector Container */}
+              {showEnvInspector && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900/60 space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-slate-900 pb-1.5">
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-pink-400">
+                      📄 File Inspector: {envFilePath}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEnvInspector(false)}
+                      className="text-[10px] text-slate-500 hover:text-slate-300 font-bold"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                  <pre className="font-mono text-[10px] leading-relaxed text-slate-350 bg-slate-950 max-h-[220px] overflow-y-auto p-3 rounded-lg border border-slate-900 select-text select-all block whitespace-pre overflow-x-auto scrollbar-thin">
+                    {envFileContent}
+                  </pre>
+                  <p className="text-[9px] text-slate-500 leading-normal italic">
+                    ℹ️ Below is the exact raw file read from server disk. Double check that URLs do not end with trailing slashes and passwords are correctly entered without spaces.
+                  </p>
+                </div>
+              )}
+
+              {/* Connection Response Container */}
+              {testApiResponse && (
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full ${testApiResponse.reachable ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Connection Status: {testApiResponse.reachable ? "REACHABLE" : "UNREACHABLE"}
+                      </span>
+                    </div>
+                    {testApiResponse.token && (
+                      <span className="bg-pink-950/40 text-pink-400 border border-pink-800/40 px-2 py-0.5 rounded text-[8.5px] font-bold font-mono uppercase tracking-wider">
+                        Token Received
+                      </span>
+                    )}
+                  </div>
+
+                  {testApiResponse.error && (
+                    <div className="text-[10px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2.5 rounded-xl">
+                      ⚠ {testApiResponse.error}
+                    </div>
+                  )}
+
+                  {testApiResponse.token && (
+                    <div className="space-y-1">
+                      <span className="text-[9.5px] uppercase font-bold text-slate-500 tracking-wider">
+                        Authentication Token:
+                      </span>
+                      <div className="font-mono text-[10.5px] leading-relaxed text-slate-300 bg-slate-950 max-h-[120px] overflow-y-auto p-3 rounded-xl border border-slate-900 shadow-inner select-text select-all">
+                        <pre className="whitespace-pre-wrap break-all">{testApiResponse.token}</pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Status */}
+            {credMsg && (
+              <div className={`p-3 rounded-xl text-[11px] border leading-relaxed ${
+                credMsg.type === "success"
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  : "bg-red-500/10 text-red-400 border-red-500/20"
+              }`}>
+                {credMsg.type === "success" ? "✅" : "❌"} {credMsg.text}
+              </div>
+            )}
+
+            {/* Save button */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={credLoading}
+                onClick={async () => {
+                  setCredLoading(true);
+                  setCredMsg(null);
+                  try {
+                    const payload: Record<string, string> = {
+                      SAVIYNT_DEV_URL:      creds.DEV.url,
+                      SAVIYNT_DEV_USERNAME: creds.DEV.username,
+                      SAVIYNT_DEV_PASSWORD: creds.DEV.password,
+                      SAVIYNT_PRE_URL:      creds.PRE.url,
+                      SAVIYNT_PRE_USERNAME: creds.PRE.username,
+                      SAVIYNT_PRE_PASSWORD: creds.PRE.password,
+                      SAVIYNT_PROD_URL:     creds.PROD.url,
+                      SAVIYNT_PROD_USERNAME:creds.PROD.username,
+                      SAVIYNT_PROD_PASSWORD:creds.PROD.password,
+                      WORKSPACE_ROOT:       workspaceRoot,
+                      GITHUB_TOKEN:         githubToken,
+                    };
+                    const res = await fetch("/api/day0/tenant-credentials", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+                    if (!res.ok) {
+                      const err = await res.json();
+                      throw new Error(err.error || "Save failed");
+                    }
+                    setCredMsg({ type: "success", text: "Credentials saved to .env.local. Restart the dev server (or redeploy) for changes to take effect." });
+                    setCredFileExists(true);
+                  } catch (err: any) {
+                    setCredMsg({ type: "error", text: err.message || "Failed to save credentials." });
+                  } finally {
+                    setCredLoading(false);
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2 hover:scale-[1.02] active:scale-95"
+                style={{ background: "linear-gradient(135deg, #db2777, #9333ea)", boxShadow: "0 2px 12px rgba(219,39,119,0.3)" }}
+              >
+                {credLoading ? "Saving..." : "🔑 Save Credentials"}
+              </button>
+              <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
+                On Vercel: use the dashboard Environment Variables instead.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -832,15 +1996,34 @@ export default function Day0SetupPage() {
             
             {/* Header & Tabs */}
             <div className="space-y-3">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--accent)" }}>
-                  Live Workspace Health
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--accent)" }}>
+                    Live Workspace Health
+                  </div>
+                  <h3 className="text-sm font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>Day 0 Onboarding status</h3>
                 </div>
-                <h3 className="text-sm font-bold mt-1" style={{ color: "var(--text-primary)" }}>Day 0 Onboarding status</h3>
-                <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Real-time scan of your local disk folders and credentials matching Saviynt tenants:
-                </p>
+                <button
+                  type="button"
+                  onClick={handleRefreshHealth}
+                  disabled={healthRefreshing || currentStatus.loading}
+                  className={`px-3 py-1.5 rounded-xl border text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 hover:scale-[1.02] active:scale-95 ${
+                    healthRefreshing ? "opacity-50" : ""
+                  }`}
+                  style={{ backgroundColor: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--accent)" }}
+                  title="Pull latest changes from remote and refresh status"
+                >
+                  {healthRefreshing ? (
+                    <span className="animate-spin inline-block">⟳</span>
+                  ) : (
+                    "🔄"
+                  )}
+                  {healthRefreshing ? "Syncing..." : "Sync Git"}
+                </button>
               </div>
+              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Real-time scan of your local disk folders and credentials matching Saviynt tenants:
+              </p>
 
               {/* Dynamic Connection Status Badge */}
               <div 
@@ -1441,20 +2624,29 @@ export default function Day0SetupPage() {
                   <p className="text-[11px] text-slate-400 leading-normal">
                     Successfully connected! The following environment/asset folders exist inside your remote repository:
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1 max-h-[350px] overflow-y-auto p-2 rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-base)" }}>
                     {remoteFolders.map((folder) => {
-                      const isEnvFolder = ["DEV", "PRE", "PROD"].includes(folder.toUpperCase());
+                      const parts = folder.split("/");
+                      const name = parts[parts.length - 1];
+                      const depth = parts.length - 1;
+                      const isEnvFolder = parts.length === 1 && ["DEV", "PRE", "PROD"].includes(name.toUpperCase());
+                      
                       return (
                         <div 
                           key={folder}
-                          className={`px-3 py-2.5 rounded-xl border font-mono text-xs flex items-center gap-2 transition-all ${
+                          className={`px-3 py-1.5 rounded-lg border font-mono text-xs flex items-center gap-2 transition-all ${
                             isEnvFolder 
-                              ? "bg-indigo-950/20 border-indigo-500/30 text-indigo-300"
-                              : "bg-slate-900 border-slate-800 text-slate-300"
+                              ? "bg-indigo-950/35 border-indigo-500/30 text-indigo-300 font-extrabold"
+                              : "border-transparent text-slate-300 hover:bg-white/5"
                           }`}
+                          style={{
+                            paddingLeft: `${depth * 20 + 12}px`
+                          }}
                         >
-                          <span>{isEnvFolder ? "🔑" : "📁"}</span>
-                          <span className="truncate">{folder}/</span>
+                          <span className="text-slate-500 font-semibold select-none">
+                            {depth > 0 ? "├─ 📁" : isEnvFolder ? "🔑" : "📁"}
+                          </span>
+                          <span className="truncate">{name}/</span>
                         </div>
                       );
                     })}

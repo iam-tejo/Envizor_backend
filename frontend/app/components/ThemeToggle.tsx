@@ -10,6 +10,7 @@ const ICON_MAP: Record<ThemeId, string> = {
   cyberpunk: "⚡",
   forest:    "🌿",
   sunset:    "🌇",
+  lavender:  "🪻",
 };
 
 const PALETTE_MAP: Record<ThemeId, string[]> = {
@@ -19,6 +20,7 @@ const PALETTE_MAP: Record<ThemeId, string[]> = {
   cyberpunk: ["#0a0010", "#1a0030", "#e040fb"],
   forest:    ["#030f07", "#064e28", "#10b981"],
   sunset:    ["#1a0b08", "#2e120d", "#f97316"],
+  lavender:  ["#0f0b1a", "#1a122e", "#8b5cf6"],
 };
 
 export default function ThemeToggle() {
