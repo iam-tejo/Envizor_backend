@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { isTileLockedForRole } from "@/app/lib/roleConfig";
 import "./WizardWelcome.css";
 
 type LockedModalInfo = {
@@ -9,17 +10,90 @@ type LockedModalInfo = {
   name: string;
 };
 
+const tilesData = [
+  {
+    id: "tile-know-more",
+    name: "Know More about Envizor",
+    href: "/wizard/know-more",
+    gradient: "from-cyan-400 via-sky-400 to-blue-500",
+    description: "Interactive walkthrough of the AI-driven IGA & Terraform process, environment pipelines, and why Envizor is used."
+  },
+  {
+    id: "tile-day0-setup",
+    name: "Day 0 Setup",
+    href: "/wizard/day0-setup",
+    gradient: "from-indigo-500 via-purple-500 to-indigo-500",
+    description: "Configure workspaces, edit Saviynt tenant details, and pull baseline configuration HCL assets."
+  },
+  {
+    id: "tile-iga-explorer",
+    name: "IGA Tenants Explorer",
+    gradient: "from-indigo-400 to-indigo-600",
+    href: "/wizard/day0",
+    description: "Import existing Saviynt artefacts and bootstrap Terraform state for any environment."
+  },
+  {
+    id: "tile-workspace-explorer",
+    name: "Terraform Workspace Explorer",
+    gradient: "from-sky-400 to-sky-600",
+    href: "/wizard/explorer",
+    description: "Browse Terraform workspaces and inspect generated files directly in the Hub."
+  },
+  {
+    id: "tile-terraform-wizard",
+    name: "DevOps Terraform Wizard",
+    gradient: "from-blue-400 to-blue-600",
+    href: "/wizard/home",
+    description: "Configure your workspace, select operations, and generate Terraform packages with ease."
+  },
+  {
+    id: "tile-connected-app",
+    name: "Connected App JSON Generator",
+    gradient: "from-purple-400 to-purple-600",
+    href: "/wizard/connected-app",
+    description: "Generate and onboard SCIM, REST, Database, and File application integration JSON configurations."
+  },
+  {
+    id: "tile-disconnected-app-onboarding",
+    name: "Disconnected Application Onboarding",
+    gradient: "from-teal-500 to-emerald-600",
+    href: "/wizard/disconnected-onboarding",
+    description: "Onboard systems without APIs. The AI Agent logs in with credentials, extracts access, creates Saviynt connections, and automates provisioning tasks."
+  },
+  {
+    id: "tile-analytics",
+    name: "Analytics & Insights",
+    gradient: "from-emerald-400 to-emerald-600",
+    href: "/wizard/analytics",
+    description: "Execute SQL database queries on Saviynt schema guidelines to discover and visualize user operational stats."
+  },
+  {
+    id: "tile-ai-agent",
+    name: "🧠 AI Agent Console",
+    gradient: "from-amber-400 via-orange-500 to-red-500",
+    href: "/wizard/agent",
+    description: "Chat directly with Envizor's agentic brain, inspect the local filesystem, stage and apply live code modifications."
+  },
+  {
+    id: "tile-deploy-agent",
+    name: "Deploy through Agent",
+    gradient: "from-pink-500 via-purple-600 to-indigo-600",
+    href: "/wizard/deploy-agent",
+    description: "Run automated deployments, manage sync schedules between environments (DEV -> PRE -> PROD), and view/approve staged changes."
+  }
+];
+
 export default function WizardWelcome() {
   const router = useRouter();
 
   // User identities and custom permissions state
   const [userName, setUserName] = useState("user");
-  const [userRole, setUserRole] = useState("BasicUser");
+  const [userRole, setUserRole] = useState("Stakeholders");
   const [userPermissions, setUserPermissions] = useState<string[]>(["tile-know-more"]);
 
   // Modal triggers and input tracking
   const [targetTile, setTargetTile] = useState<LockedModalInfo | null>(null);
-  const [requestedScope, setRequestedScope] = useState("DEV_Admin");
+  const [requestedScope, setRequestedScope] = useState("Developers");
   const [justification, setJustification] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -36,7 +110,7 @@ export default function WizardWelcome() {
       // Load user latest role from central custom roles map
       const overriddenRoles = localStorage.getItem("envizor_custom_roles");
       const rolesMap = overriddenRoles ? JSON.parse(overriddenRoles) : {};
-      const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || "BasicUser";
+      const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || "Stakeholders";
       
       // Update session storage immediately
       sessionStorage.setItem("envizor_user_role", latestRole);
@@ -49,15 +123,44 @@ export default function WizardWelcome() {
       const permsMap = allPerms ? JSON.parse(allPerms) : {};
       let userPerms = permsMap[user.toLowerCase()] || ["tile-know-more"];
 
-      // Self-healing mechanism: If role is BasicUser, reset permissions back to know-more strictly
+      // Self-healing mechanism: If role is Stakeholders or BasicUser, reset permissions back to know-more strictly
       const rNormalized = latestRole.replace(/\s+|_/g, "").toUpperCase();
-      if (rNormalized === "BASICUSER") {
+      if (rNormalized === "BASICUSER" || rNormalized === "STAKEHOLDERS") {
         userPerms = ["tile-know-more"];
         permsMap[user.toLowerCase()] = userPerms;
         localStorage.setItem("envizor_user_permissions", JSON.stringify(permsMap));
       }
 
       setUserPermissions(userPerms);
+
+      // Proactively sync local storage registers to server database
+      const registered = localStorage.getItem("envizor_registered_users");
+      fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          users: registered ? JSON.parse(registered) : null,
+          customRoles: rolesMap,
+          permissions: permsMap
+        })
+      }).catch((err) => console.error("Error syncing to server database on Welcome mount:", err));
+
+      // Check for requestAccess parameter in URL to auto-trigger gating modal
+      const searchParams = new URLSearchParams(window.location.search);
+      const requestAccessTileId = searchParams.get("requestAccess");
+      if (requestAccessTileId) {
+        const matchingTile = tilesData.find((t) => t.id === requestAccessTileId);
+        if (matchingTile) {
+          setTargetTile({ id: matchingTile.id, name: matchingTile.name });
+          setJustification("");
+          setRequestedScope("DEV_Admin");
+          setIsJit(true);
+          setJitDuration(240);
+          setSuccessMessage(null);
+          // Clean URL params so modal doesn't pop up again on manual refresh
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
     }
   }, []);
 
@@ -93,34 +196,21 @@ export default function WizardWelcome() {
 
   // Verification if specific tile is locked for the user
   function isTileLocked(tileId: string) {
-    const r = userRole.replace(/\s+|_/g, "").toUpperCase();
-
-    if (r === "SUPERADMIN") return false;
-    if (tileId === "tile-know-more") return false;
-
-    if (r === "BASICUSER") {
-      return !userPermissions.includes(tileId);
-    }
-
-    if (r === "DEVADMIN" || r === "PREADMIN" || r === "PRODADMIN") {
-      return false; // All environment admins have full access to all premium tiles
-    }
-
-    return true;
+    return isTileLockedForRole(userRole, tileId, userPermissions);
   }
 
   const handleTileClick = (tileId: string, tileName: string, href: string) => {
     if (tileId === "tile-request-role") {
-      setTargetTile({ id: "tile-day0-setup", name: "Premium Workspace Environment" });
+      setTargetTile({ id: tileId, name: tileName });
       setJustification("");
-      setRequestedScope("DEV_Admin");
+      setRequestedScope("Developers");
       setIsJit(true);
       setJitDuration(240);
       setSuccessMessage(null);
     } else if (isTileLocked(tileId)) {
       setTargetTile({ id: tileId, name: tileName });
       setJustification("");
-      setRequestedScope("DEV_Admin");
+      setRequestedScope("Developers");
       setIsJit(true);
       setJitDuration(240);
       setSuccessMessage(null);
@@ -171,79 +261,6 @@ export default function WizardWelcome() {
     shadow-lg p-6
     transition-all duration-300 flex flex-col select-none
   `;
-
-  const tilesData = [
-    {
-      id: "tile-know-more",
-      name: "Know More about Envizor",
-      href: "/wizard/know-more",
-      gradient: "from-cyan-400 via-sky-400 to-blue-500",
-      description: "Interactive walkthrough of the AI-driven IGA & Terraform process, environment pipelines, and why Envizor is used."
-    },
-    {
-      id: "tile-day0-setup",
-      name: "Day 0 Setup",
-      href: "/wizard/day0-setup",
-      gradient: "from-indigo-500 via-purple-500 to-indigo-500",
-      description: "Configure workspaces, edit Saviynt tenant details, and pull baseline configuration HCL assets."
-    },
-    {
-      id: "tile-iga-explorer",
-      name: "IGA Tenants Explorer",
-      gradient: "from-indigo-400 to-indigo-600",
-      href: "/wizard/day0",
-      description: "Import existing Saviynt artefacts and bootstrap Terraform state for any environment."
-    },
-    {
-      id: "tile-workspace-explorer",
-      name: "Terraform Workspace Explorer",
-      gradient: "from-sky-400 to-sky-600",
-      href: "/wizard/explorer",
-      description: "Browse Terraform workspaces and inspect generated files directly in the Hub."
-    },
-    {
-      id: "tile-terraform-wizard",
-      name: "DevOps Terraform Wizard",
-      gradient: "from-blue-400 to-blue-600",
-      href: "/wizard/home",
-      description: "Configure your workspace, select operations, and generate Terraform packages with ease."
-    },
-    {
-      id: "tile-connected-app",
-      name: "Connected App JSON Generator",
-      gradient: "from-purple-400 to-purple-600",
-      href: "/wizard/connected-app",
-      description: "Generate and onboard SCIM, REST, Database, and File application integration JSON configurations."
-    },
-    {
-      id: "tile-disconnected-app-onboarding",
-      name: "Disconnected Application Onboarding",
-      gradient: "from-teal-500 to-emerald-600",
-      href: "/wizard/disconnected-onboarding",
-      description: "Onboard systems without APIs. The AI Agent logs in with credentials, extracts access, creates Saviynt connections, and automates provisioning tasks."
-    },
-    {
-      id: "tile-analytics",
-      name: "Analytics & Insights",
-      gradient: "from-emerald-400 to-emerald-600",
-      href: "/wizard/analytics",
-      description: "Execute SQL database queries on Saviynt schema guidelines to discover and visualize user operational stats."
-    },
-    {
-      id: "tile-ai-agent",
-      name: "🧠 AI Agent Console",
-      gradient: "from-amber-400 via-orange-500 to-red-500",
-      href: "/wizard/agent",
-      description: "Chat directly with Envizor's agentic brain, inspect the local filesystem, stage and apply live code modifications."
-    },
-    {
-      id: "tile-deploy-agent",
-      name: "Deploy through Agent",
-      gradient: "from-pink-500 via-purple-600 to-indigo-600",
-      href: "/wizard/deploy-agent",
-      description: "Run automated deployments, manage sync schedules between environments (DEV -> PRE -> PROD), and view/approve staged changes."
-    }
-  ];
 
   const visibleTiles = tilesData.filter((tile) => {
     const r = userRole.replace(/\s+|_/g, "").toUpperCase();
@@ -321,9 +338,9 @@ export default function WizardWelcome() {
             </div>
           </div>
 
-          {userRole === "BasicUser" && (
+          {userRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "STAKEHOLDERS" || r === "BASICUSER") && (
             <div className="text-[11px] text-amber-300 leading-normal max-w-md bg-amber-955/20 border border-amber-800/40 rounded-xl p-2.5">
-              ⚠️ <strong>Basic User Mode:</strong> Access is restricted to basic pages. Click the role activation tile below to request permissions from the SuperAdmin.
+              ⚠️ <strong>Limited Role Mode:</strong> Access is restricted to basic pages. Click the role activation tile below to request permissions from the SuperAdmin.
             </div>
           )}
         </div>
@@ -391,8 +408,8 @@ export default function WizardWelcome() {
           );
         })}
 
-        {/* 🔑 Request Premium Role Activation for BasicUser */}
-        {userRole === "BasicUser" && (
+        {/* 🔑 Request Premium Role Activation for Stakeholders */}
+        {userRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "STAKEHOLDERS" || r === "BASICUSER") && (
           <div
             onClick={() => handleTileClick("tile-request-role", "Request Role Activation", "")}
             className={`${tileBase} cursor-pointer border border-dashed border-amber-500/30 bg-amber-955/15 hover:bg-amber-955/25 hover:border-amber-400/50 transition-all`}
@@ -406,13 +423,13 @@ export default function WizardWelcome() {
               </h2>
             </div>
             <p className="text-sm text-slate-350 leading-relaxed">
-              Apply for administrative environment role privileges (**DEV Admin**, **PRE Admin**, or **PROD Admin**) to access active Terraform and IGA explorer workspaces.
+              Apply for administrative environment role privileges (**Developers**, **Dev Ops**, or **Administrators**) to access active Terraform and IGA explorer workspaces.
             </p>
           </div>
         )}
 
         {/* Reports & Dashboards — coming soon */}
-        {userRole !== "BasicUser" && (
+        {!userRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "STAKEHOLDERS" || r === "BASICUSER") && (
           <>
             <div className={`${tileBase} opacity-30 cursor-not-allowed`} id="tile-reports">
               <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-orange-400 to-orange-600 mb-4" />
@@ -476,7 +493,7 @@ export default function WizardWelcome() {
                 {/* Scrollable form body */}
                 <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    You currently possess the <strong className="text-slate-200">BasicUser</strong> role, which restricts access to this premium operational tile. Select an environment scope below to request activation:
+                    You currently possess the <strong className="text-slate-205">{userRole}</strong> role, which restricts access to this premium operational tile. Select an elevation scope below to request activation:
                   </p>
 
                   <div className="space-y-2">
@@ -486,11 +503,11 @@ export default function WizardWelcome() {
                     
                     {/* Premium Stacked Interactive Role Cards */}
                     <div className="grid grid-cols-1 gap-3">
-                      {/* DEV Admin Card */}
+                      {/* Developers Card */}
                       <div
-                        onClick={() => setRequestedScope("DEV_Admin")}
+                        onClick={() => setRequestedScope("Developers")}
                         className={`cursor-pointer border p-3 rounded-xl transition-all duration-200 flex items-start gap-3 select-none ${
-                          requestedScope === "DEV_Admin"
+                          requestedScope === "Developers"
                             ? "border-sky-500 bg-sky-950/20 shadow-[0_0_12px_rgba(14,165,233,0.15)]"
                             : "border-slate-800 bg-slate-900/40 hover:bg-slate-900/70 hover:border-slate-700"
                         }`}
@@ -498,23 +515,23 @@ export default function WizardWelcome() {
                         <div className="text-xl mt-0.5">🛠️</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <h4 className={`text-xs font-bold ${requestedScope === "DEV_Admin" ? "text-sky-400" : "text-slate-200"}`}>
-                              DEV Admin
+                            <h4 className={`text-xs font-bold ${requestedScope === "Developers" ? "text-sky-400" : "text-slate-200"}`}>
+                              Developers
                             </h4>
-                            {requestedScope === "DEV_Admin" && (
+                            {requestedScope === "Developers" && (
                               <span className="text-[8px] bg-sky-500/20 text-sky-400 font-extrabold px-1.5 py-0.5 rounded border border-sky-400/30 uppercase tracking-wider">Selected</span>
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Serves: Integration Development &amp; Sandbox Testing</p>
-                          <p className="text-[10px] text-slate-500 mt-1 leading-normal">Configures dynamic tenant parameters, bootstraps baseline schemas, and tests REST/SCIM custom API endpoints.</p>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Serves: Onboard apps &amp; workspace configuration</p>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-normal">Allows importing Saviynt HCL configurations, managing baseline properties, and staging workspace schema variables.</p>
                         </div>
                       </div>
 
-                      {/* PRE Admin Card */}
+                      {/* Dev Ops Card */}
                       <div
-                        onClick={() => setRequestedScope("PRE_Admin")}
+                        onClick={() => setRequestedScope("Dev Ops")}
                         className={`cursor-pointer border p-3 rounded-xl transition-all duration-200 flex items-start gap-3 select-none ${
-                          requestedScope === "PRE_Admin"
+                          requestedScope === "Dev Ops"
                             ? "border-amber-500 bg-amber-950/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
                             : "border-slate-800 bg-slate-900/40 hover:bg-slate-900/70 hover:border-slate-700"
                         }`}
@@ -522,23 +539,23 @@ export default function WizardWelcome() {
                         <div className="text-xl mt-0.5">✨</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <h4 className={`text-xs font-bold ${requestedScope === "PRE_Admin" ? "text-amber-400" : "text-slate-200"}`}>
-                              PRE Admin
+                            <h4 className={`text-xs font-bold ${requestedScope === "Dev Ops" ? "text-amber-400" : "text-slate-200"}`}>
+                              Dev Ops
                             </h4>
-                            {requestedScope === "PRE_Admin" && (
+                            {requestedScope === "Dev Ops" && (
                               <span className="text-[8px] bg-amber-500/20 text-amber-400 font-extrabold px-1.5 py-0.5 rounded border border-amber-400/30 uppercase tracking-wider">Selected</span>
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Serves: Pre-Production Staging &amp; Drift Audit</p>
-                          <p className="text-[10px] text-slate-500 mt-1 leading-normal">Compares environment configurations, runs delta validations, reviews draft states, and stages upcoming deployments.</p>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Serves: Pipeline orchestration &amp; sync deployments</p>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-normal">Compares DEV/PRE/PROD directory parameters, runs drift reconciliations, and publishes commit packages.</p>
                         </div>
                       </div>
 
-                      {/* PROD Admin Card */}
+                      {/* Administrators Card */}
                       <div
-                        onClick={() => setRequestedScope("PROD_Admin")}
+                        onClick={() => setRequestedScope("Administrators")}
                         className={`cursor-pointer border p-3 rounded-xl transition-all duration-200 flex items-start gap-3 select-none ${
-                          requestedScope === "PROD_Admin"
+                          requestedScope === "Administrators"
                             ? "border-emerald-500 bg-emerald-950/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
                             : "border-slate-800 bg-slate-900/40 hover:bg-slate-900/70 hover:border-slate-700"
                         }`}
@@ -546,15 +563,15 @@ export default function WizardWelcome() {
                         <div className="text-xl mt-0.5">🚀</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <h4 className={`text-xs font-bold ${requestedScope === "PROD_Admin" ? "text-emerald-400" : "text-slate-200"}`}>
-                              PROD Admin
+                            <h4 className={`text-xs font-bold ${requestedScope === "Administrators" ? "text-emerald-400" : "text-slate-200"}`}>
+                              Administrators
                             </h4>
-                            {requestedScope === "PROD_Admin" && (
+                            {requestedScope === "Administrators" && (
                               <span className="text-[8px] bg-emerald-500/20 text-emerald-400 font-extrabold px-1.5 py-0.5 rounded border border-emerald-400/30 uppercase tracking-wider">Selected</span>
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Serves: Live Production Transport &amp; Commits</p>
-                          <p className="text-[10px] text-slate-500 mt-1 leading-normal">Authorizes and executes live Terraform workspace transfers, builds package promotions, and triggers live pipeline workflows.</p>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Serves: Root administrative console &amp; access approvals</p>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-normal">Authorizes direct platform configuration commits, audits user registry roles, and manages approvals queue.</p>
                         </div>
                       </div>
                     </div>

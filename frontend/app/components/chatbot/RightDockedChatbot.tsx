@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { isTileLockedForRole } from "@/app/lib/roleConfig";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type FileNode = {
@@ -503,7 +504,7 @@ function TypewriterBubble({ text, onDone }: { text: string; onDone?: () => void 
 }
 
 function RoleRequestCard({ userName, onSubmit }: { userName: string; onSubmit: (role: string, duration: string, just: string) => void }) {
-  const [selRole, setSelRole] = useState("DEV_Admin");
+  const [selRole, setSelRole] = useState("Developers");
   const [mode, setMode] = useState<"JIT" | "Permanent">("JIT");
   const [hrs, setHrs] = useState("4");
   const [just, setJust] = useState("");
@@ -536,12 +537,12 @@ function RoleRequestCard({ userName, onSubmit }: { userName: string; onSubmit: (
 
       {/* Role selector */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Target Administrative Role</label>
+        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Target Role Elevation</label>
         <div className="grid grid-cols-1 gap-1.5">
           {[
-            { val: "DEV_Admin", label: "🛠️ DEV Admin", desc: "DEV workspace read-write" },
-            { val: "PRE_Admin", label: "✨ PRE Admin", desc: "DEV + PRE staging environments" },
-            { val: "PROD_Admin", label: "🚀 PROD Admin", desc: "Full production deployment access" },
+            { val: "Developers", label: "🛠️ Developers", desc: "Workspace configuration & setup" },
+            { val: "Dev Ops", label: "⚙️ Dev Ops", desc: "Reconcile, sync, & deployment" },
+            { val: "Administrators", label: "🛡️ Administrators", desc: "Full administrative approvals console" },
           ].map((r) => (
             <button
               key={r.val}
@@ -697,7 +698,7 @@ export default function RightDockedChatbot({
 
   // User identity
   const [userName, setUserName] = useState("user");
-  const [userRole, setUserRole] = useState("BasicUser");
+  const [userRole, setUserRole] = useState("Stakeholders");
   const [userPermissions, setUserPermissions] = useState<string[]>(["tile-know-more"]);
   const [userAvatar, setUserAvatar] = useState<string>("👤");
 
@@ -752,7 +753,7 @@ export default function RightDockedChatbot({
     const user = sessionStorage.getItem("envizor_username") || "user";
     const overriddenRoles = localStorage.getItem("envizor_custom_roles");
     const rolesMap = overriddenRoles ? JSON.parse(overriddenRoles) : {};
-    const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (user.toLowerCase() === "admin" ? "SuperAdmin" : "BasicUser");
+    const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (user.toLowerCase() === "admin" ? "Administrators" : "Stakeholders");
     setUserRole(latestRole);
     setUserName(user);
 
@@ -820,7 +821,7 @@ export default function RightDockedChatbot({
       checkJit();
       const overriddenRoles = localStorage.getItem("envizor_custom_roles");
       const rolesMap = overriddenRoles ? JSON.parse(overriddenRoles) : {};
-      setUserRole(rolesMap[userName.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (userName.toLowerCase() === "admin" ? "SuperAdmin" : "BasicUser"));
+      setUserRole(rolesMap[userName.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (userName.toLowerCase() === "admin" ? "Administrators" : "Stakeholders"));
       const allPerms = localStorage.getItem("envizor_user_permissions");
       const permsMap = allPerms ? JSON.parse(allPerms) : {};
       setUserPermissions(permsMap[userName.toLowerCase()] || ["tile-know-more"]);
@@ -929,7 +930,7 @@ export default function RightDockedChatbot({
     try {
       const user = userName || "user";
       const rolesMap = JSON.parse(localStorage.getItem("envizor_custom_roles") || "{}");
-      rolesMap[user.toLowerCase()] = role === "DEV_Admin" ? "DEV Admin" : role === "PRE_Admin" ? "PRE Admin" : role === "PROD_Admin" ? "PROD Admin" : role;
+      rolesMap[user.toLowerCase()] = role;
       localStorage.setItem("envizor_custom_roles", JSON.stringify(rolesMap));
 
       const allPerms = JSON.parse(localStorage.getItem("envizor_user_permissions") || "{}");
@@ -944,7 +945,7 @@ export default function RightDockedChatbot({
       if (duration !== "Permanent") {
         const hours = parseInt(duration.replace(/[^0-9]/g, "")) || 4;
         const jitMap = JSON.parse(localStorage.getItem("envizor_jit_access") || "{}");
-        jitMap[user.toLowerCase()] = { targetRole: rolesMap[user.toLowerCase()], expiresAt: Date.now() + hours * 3600000, requestedAt: Date.now(), durationHours: hours };
+        jitMap[user.toLowerCase()] = { targetRole: role, expiresAt: Date.now() + hours * 3600000, requestedAt: Date.now(), durationHours: hours };
         localStorage.setItem("envizor_jit_access", JSON.stringify(jitMap));
       } else {
         const jitMap = JSON.parse(localStorage.getItem("envizor_jit_access") || "{}");
@@ -953,8 +954,20 @@ export default function RightDockedChatbot({
       }
 
       const reqs = JSON.parse(localStorage.getItem("envizor_access_requests") || "[]");
-      reqs.push({ id: `BOT-${Math.floor(1000 + Math.random() * 9000)}`, timestamp: new Date().toISOString(), username: user, tileId: "all-unlocked-bot", tileName: "Full Platform Unlock", requestedRole: rolesMap[user.toLowerCase()], justification, status: "APPROVED" });
+      reqs.push({ id: `BOT-${Math.floor(1000 + Math.random() * 9000)}`, timestamp: new Date().toISOString(), username: user, tileId: "all-unlocked-bot", tileName: "Full Platform Unlock", requestedRole: role, justification, status: "APPROVED" });
       localStorage.setItem("envizor_access_requests", JSON.stringify(reqs));
+
+      // Sync changes to server database
+      const registered = localStorage.getItem("envizor_registered_users");
+      fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          users: registered ? JSON.parse(registered) : null,
+          customRoles: rolesMap,
+          permissions: allPerms
+        })
+      }).catch((err) => console.error("Error syncing JIT elevation to server:", err));
 
       window.dispatchEvent(new CustomEvent("storage"));
       window.dispatchEvent(new CustomEvent("envizorRoleChanged"));
@@ -970,7 +983,7 @@ export default function RightDockedChatbot({
   const handleRoleSubmit = (role: string, duration: string, justification: string) => {
     setAvatarPulse("thinking");
     setTimeout(() => {
-      const isProd = role === "PROD_Admin" || role.includes("PROD");
+      const isProd = role === "Administrators";
       if (isProd) {
         try {
           const user = userName || "user";
@@ -984,7 +997,7 @@ export default function RightDockedChatbot({
             username: user,
             tileId: "all-unlocked-bot",
             tileName: "Full Platform Unlock",
-            requestedRole: "PROD Admin",
+            requestedRole: "Administrators",
             justification,
             status: "PENDING" as const,
             isJit,
@@ -997,10 +1010,10 @@ export default function RightDockedChatbot({
           
           setAvatarPulse("idle");
           addBotMessage(
-            `⏳ **Role Request Staged — PENDING SUPERADMIN APPROVAL**\n\n` +
-            `Your request to elevate your privileges to **PROD Admin** (${duration === "Permanent" ? "Permanent" : `${duration} JIT`}) has been successfully submitted to the governance approval queue.\n\n` +
-            `🛡️ **Security Protocol**: Production environment elevations require manual validation by a registered SuperAdmin.\n\n` +
-            `You can monitor the status of this request by asking me for *"my approvals"*, or by visiting your **Profile** page. Once the SuperAdmin reviews and approves it, your temporal session will activate instantly!`,
+            `⏳ **Role Request Staged — PENDING ADMIN APPROVAL**\n\n` +
+            `Your request to elevate your privileges to **Administrators** (${duration === "Permanent" ? "Permanent" : `${duration} JIT`}) has been successfully submitted to the governance approval queue.\n\n` +
+            `🛡️ **Security Protocol**: Administrative elevations require manual validation by a registered Administrator.\n\n` +
+            `You can monitor the status of this request by asking me for *"my approvals"*, or by visiting your **Profile** page. Once the Admin reviews and approves it, your temporal session will activate instantly!`,
             [{ label: "📋 Check Approvals Queue", actionName: "approvals" }],
             undefined,
             true
@@ -1010,9 +1023,8 @@ export default function RightDockedChatbot({
         }
       } else {
         elevateUserRole(role, duration, justification);
-        const roleLabel = role === "DEV_Admin" ? "DEV Admin" : role === "PRE_Admin" ? "PRE Admin" : "PROD Admin";
         const durationLabel = duration === "Permanent" ? "permanent" : `${duration} JIT`;
-        addBotMessage(`⚡ **AI Auto-Approver — ACCESS GRANTED**\n\nJustification reviewed and approved.\n\n✅ Your role has been elevated to **${roleLabel}** (${durationLabel}).\n\nAll locked tool tiles on your Welcome Hub are now **unlocked in real time**! Refresh or navigate back to the dashboard to access the full platform. Welcome to the inner circle! 🎉`, undefined, undefined, true);
+        addBotMessage(`⚡ **AI Auto-Approver — ACCESS GRANTED**\n\nJustification reviewed and approved.\n\n✅ Your role has been elevated to **${role}** (${durationLabel}).\n\nAll locked tool tiles on your Welcome Hub are now **unlocked in real time**! Refresh or navigate back to the dashboard to access the full platform. Welcome to the inner circle! 🎉`, undefined, undefined, true);
       }
     }, 2000);
   };
@@ -1159,8 +1171,6 @@ export default function RightDockedChatbot({
 
   // ─── Access gating ────────────────────────────────────────────────────────
   const checkActionAllowed = (actionName: string): boolean => {
-    const r = userRole.replace(/\s+|_/g, "").toUpperCase();
-    if (r === "SUPERADMIN") return true;
     const actionToTileMap: Record<string, string> = {
       launch_day0_setup: "tile-day0-setup",
       baseline_start: "tile-day0-setup",
@@ -1185,8 +1195,7 @@ export default function RightDockedChatbot({
     };
     const tile = actionToTileMap[actionName];
     if (!tile) return true;
-    if (r === "BASICUSER") return userPermissions.includes(tile);
-    return true;
+    return !isTileLockedForRole(userRole, tile, userPermissions);
   };
 
   // ─── Action router ────────────────────────────────────────────────────────

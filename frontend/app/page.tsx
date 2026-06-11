@@ -74,7 +74,7 @@ export default function LoginPage() {
         email: email.trim(),
         username: username.trim(),
         password: p,
-        role: "BasicUser"
+        role: "Stakeholders"
       });
       localStorage.setItem("envizor_registered_users", JSON.stringify(usersList));
 
@@ -83,6 +83,19 @@ export default function LoginPage() {
       const permsMap = perms ? JSON.parse(perms) : {};
       permsMap[username.trim().toLowerCase()] = ["tile-know-more"];
       localStorage.setItem("envizor_user_permissions", JSON.stringify(permsMap));
+
+      // Sync registration to server JSON database
+      const customRoles = localStorage.getItem("envizor_custom_roles");
+      const rolesMap = customRoles ? JSON.parse(customRoles) : {};
+      fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          users: usersList,
+          customRoles: rolesMap,
+          permissions: permsMap
+        })
+      }).catch((err) => console.error("Error syncing registration to server:", err));
 
       setTimeout(() => {
         setSuccessMessage("Account created successfully! You can now log in.");
@@ -99,14 +112,14 @@ export default function LoginPage() {
     let actualUsername = username.trim();
 
     if (u === "admin" && p === "envizor-super") {
-      role = "SuperAdmin";
+      role = "Administrators";
     } else {
       // Check registered users
       const registered = localStorage.getItem("envizor_registered_users");
       const usersList = registered ? JSON.parse(registered) : [];
       const matched = usersList.find((x: any) => x.username.toLowerCase() === u && x.password === p);
       if (matched) {
-        role = matched.role || "BasicUser";
+        role = matched.role || "Stakeholders";
       }
     }
 
@@ -122,6 +135,19 @@ export default function LoginPage() {
           const finalRole = rolesMap[actualUsername.toLowerCase()] || role;
 
           sessionStorage.setItem("envizor_user_role", finalRole);
+
+          // Sync database state on login
+          const registered = localStorage.getItem("envizor_registered_users");
+          const perms = localStorage.getItem("envizor_user_permissions");
+          fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              users: registered ? JSON.parse(registered) : null,
+              customRoles: rolesMap,
+              permissions: perms ? JSON.parse(perms) : null
+            })
+          }).catch((err) => console.error("Error syncing login to server:", err));
         }
         router.push("/wizard/steps/welcome");
       }, 800);

@@ -58,24 +58,31 @@ export default function AdminConsole() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState("");
 
+  // Track which user's multi-role assignment dropdown is open
+  const [openUserDropdown, setOpenUserDropdown] = useState<string | null>(null);
+
   const simulationProfiles = [
     { username: "admin", fullName: "System SuperAdmin", email: "admin@envizor.internal", defaultRole: "SuperAdmin", desc: "Highest workspace administrative privileges" },
   ];
 
   const availableRoles = [
-    "SuperAdmin",
-    "DEV_Admin",
-    "PRE_Admin",
-    "PROD_Admin",
-    "BasicUser",
+    "Administrators",
+    "Dev Ops",
+    "Developers",
+    "Business Analysts",
+    "Product Owner",
+    "Testers",
+    "Stakeholders",
   ];
 
   const roleDefinitions = [
-    { key: "SuperAdmin", label: "🛡️ Super Admin", desc: "Global root administrative privileges, manages roles, acts as approver." },
-    { key: "DEV_Admin", label: "🛠️ DEV Admin", desc: "Access to DEV workspace explorer, and read/write DEV workspace or tenants." },
-    { key: "PRE_Admin", label: "✨ PRE Admin", desc: "Access to PRE workspace explorer, and read/write PRE workspace or tenants." },
-    { key: "PROD_Admin", label: "🚀 PROD Admin", desc: "Access to PROD workspace explorer, and read/write PROD workspace or tenants." },
-    { key: "BasicUser", label: "🌱 Basic User", desc: "Default registered account. Restricts access to public welcome guides only." },
+    { key: "Administrators", label: "🛡️ Administrators", desc: "Highest administrative privileges, manages user profiles & access requests." },
+    { key: "Dev Ops", label: "⚙️ Dev Ops", desc: "Technical operations, releases, pipelines, AI agent code changes." },
+    { key: "Developers", label: "🛠️ Developers", desc: "Workspace configuration, Day 0 setup, app onboarding, API exploring." },
+    { key: "Business Analysts", label: "📊 Business Analysts", desc: "Access to connected application JSON generation & analytics workbench." },
+    { key: "Product Owner", label: "📋 Product Owner", desc: "IGA tenants explorer audit reviews and dashboard insights." },
+    { key: "Testers", label: "🧪 Testers", desc: "Workspace Explorer file checking, drift auditing, and analytics." },
+    { key: "Stakeholders", label: "🌱 Stakeholders", desc: "Overview know-more guides and viewing analytical user stats." },
   ];
 
   // Combined Directory mapping accounts dynamically
@@ -140,65 +147,84 @@ export default function AdminConsole() {
   }, []);
 
   function handleRoleChange(user: string, newRole: string) {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to re-allocate user roles.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to re-allocate user roles.");
       return;
     }
-    const normalizedRole = 
-      newRole === "DEV_Admin" ? "DEV Admin" :
-      newRole === "PRE_Admin" ? "PRE Admin" :
-      newRole === "PROD_Admin" ? "PROD Admin" :
-      newRole;
 
-    const updatedRoles = { ...customRoles, [user.toLowerCase()]: normalizedRole };
+    const updatedRoles = { ...customRoles, [user.toLowerCase()]: newRole };
     setCustomRoles(updatedRoles);
     localStorage.setItem("envizor_custom_roles", JSON.stringify(updatedRoles));
 
     // If it's a registered user, also sync their main profile role
     const matchedReg = registeredUsers.find((r) => r.username.toLowerCase() === user.toLowerCase());
+    let updatedList = [...registeredUsers];
     if (matchedReg) {
-      const updatedList = registeredUsers.map((r) =>
-        r.username.toLowerCase() === user.toLowerCase() ? { ...r, role: normalizedRole } : r
+      updatedList = registeredUsers.map((r) =>
+        r.username.toLowerCase() === user.toLowerCase() ? { ...r, role: newRole } : r
       );
       setRegisteredUsers(updatedList);
       localStorage.setItem("envizor_registered_users", JSON.stringify(updatedList));
     }
 
-    // If downgraded to BasicUser, reset all tile permissions to default
-    if (normalizedRole === "BasicUser") {
-      const perms = localStorage.getItem("envizor_user_permissions");
-      if (perms) {
-        const permsMap = JSON.parse(perms);
-        permsMap[user.toLowerCase()] = ["tile-know-more"];
-        localStorage.setItem("envizor_user_permissions", JSON.stringify(permsMap));
-      }
+    const perms = localStorage.getItem("envizor_user_permissions");
+    const permsMap = perms ? JSON.parse(perms) : {};
+
+    // If downgraded to Stakeholders or BasicUser, reset all tile permissions to default
+    const isDowngraded = newRole.split(",").map((r) => r.trim().toUpperCase()).every((r) => r === "STAKEHOLDERS" || r === "BASICUSER");
+    if (isDowngraded) {
+      permsMap[user.toLowerCase()] = ["tile-know-more"];
+      localStorage.setItem("envizor_user_permissions", JSON.stringify(permsMap));
     }
+
+    // Sync to server database
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        users: updatedList,
+        customRoles: updatedRoles,
+        permissions: permsMap
+      })
+    }).catch((err) => console.error("Error syncing role change to server:", err));
   }
 
   function handleResetRoles() {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to reset roles.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to reset roles.");
       return;
     }
     setCustomRoles({});
     localStorage.removeItem("envizor_custom_roles");
 
-    // Reset registered users roles back to BasicUser
-    const updatedList = registeredUsers.map((r) => ({ ...r, role: "BasicUser" }));
+    // Reset registered users roles back to Stakeholders
+    const updatedList = registeredUsers.map((r) => ({ ...r, role: "Stakeholders" }));
     setRegisteredUsers(updatedList);
     localStorage.setItem("envizor_registered_users", JSON.stringify(updatedList));
 
     // Reset permissions
     localStorage.removeItem("envizor_user_permissions");
+
+    // Sync reset state to server database
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        users: updatedList,
+        customRoles: {},
+        permissions: {}
+      })
+    }).catch((err) => console.error("Error syncing role reset to server:", err));
+
     alert("Registry and custom roles have been reset to defaults.");
   }
 
   function handleDeleteUser(user: string) {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to delete users.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to delete users.");
       return;
     }
     const confirm = window.confirm(`Are you sure you want to delete the registered account "${user}"?`);
@@ -213,19 +239,32 @@ export default function AdminConsole() {
     delete updatedRoles[user.toLowerCase()];
     setCustomRoles(updatedRoles);
     localStorage.setItem("envizor_custom_roles", JSON.stringify(updatedRoles));
+
+    const perms = localStorage.getItem("envizor_user_permissions");
+
+    // Sync deletion to server database
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        users: updatedList,
+        customRoles: updatedRoles,
+        permissions: perms ? JSON.parse(perms) : {}
+      })
+    }).catch((err) => console.error("Error syncing delete user to server:", err));
   }
 
   // --- ACCESS REQUEST DECISION FLOWS ---
   
   function handleApproveAccess(req: AccessRequest) {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to approve requests.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to approve requests.");
       return;
     }
     // 0. If this is a temporal Just-in-Time (JIT) privilege elevation request
     if (req.isJit && req.jitDuration) {
-      const baseRole = customRoles[req.username.toLowerCase()] || "BasicUser";
+      const baseRole = customRoles[req.username.toLowerCase()] || "Stakeholders";
       const expiresAt = Date.now() + req.jitDuration * 60 * 1000;
       
       const jitData = localStorage.getItem("envizor_jit_access");
@@ -270,6 +309,17 @@ export default function AdminConsole() {
     setAccessRequests(updatedReqs);
     localStorage.setItem("envizor_access_requests", JSON.stringify(updatedReqs));
 
+    // Sync to server database
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        users: updatedRegList,
+        customRoles: updatedRoles,
+        permissions: permsMap
+      })
+    }).catch((err) => console.error("Error syncing approved access request to server:", err));
+
     // Dispatch global storage event to synchronize layouts and chatbot instances
     window.dispatchEvent(new Event("storage"));
 
@@ -277,9 +327,9 @@ export default function AdminConsole() {
   }
 
   function handleRejectAccess(req: AccessRequest) {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to reject requests.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to reject requests.");
       return;
     }
     const updatedReqs = accessRequests.map((r) =>
@@ -299,9 +349,9 @@ export default function AdminConsole() {
   // --- PROD BASELINE COMPILATION DECISION FLOWS ---
 
   async function handleApprove(req: ApprovalRequest) {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to approve release deployments.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to approve release deployments.");
       return;
     }
     setLoading(true);
@@ -357,9 +407,9 @@ export default function AdminConsole() {
   }
 
   function handleReject(req: ApprovalRequest) {
-    const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+    const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
     if (!isSuperAdmin) {
-      alert("🛡️ Access Denied: Only SuperAdmin accounts are authorized to reject release deployments.");
+      alert("🛡️ Access Denied: Only Administrators are authorized to reject release deployments.");
       return;
     }
     const updatedReqs = requests.map((r) =>
@@ -374,7 +424,7 @@ export default function AdminConsole() {
     localStorage.removeItem("envizor_approval_requests");
   }
 
-  const isSuperAdmin = activeUserRole.replace(/\s+|_/g, "").toUpperCase() === "SUPERADMIN";
+  const isSuperAdmin = activeUserRole.split(",").map(r => r.trim().toUpperCase()).some(r => r === "ADMINISTRATORS" || r === "SUPERADMIN");
 
   return (
     <Day0Shell
@@ -583,21 +633,67 @@ export default function AdminConsole() {
                         <span className="text-slate-400 font-mono truncate pr-4" title={acc.email}>{acc.email}</span>
 
                         <div className="pr-4">
-                          <select
-                            value={
-                              acc.role.replace(/\s+|_/g, "").toUpperCase() === "DEVADMIN" ? "DEV_Admin" :
-                              acc.role.replace(/\s+|_/g, "").toUpperCase() === "PREADMIN" ? "PRE_Admin" :
-                              acc.role.replace(/\s+|_/g, "").toUpperCase() === "PRODADMIN" ? "PROD_Admin" :
-                              acc.role
-                            }
+                        <div className="relative pr-4">
+                          <button
+                            type="button"
                             disabled={!isSuperAdmin}
-                            onChange={(e) => handleRoleChange(acc.username, e.target.value)}
-                            className={`bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-sky-400 font-extrabold focus:outline-none focus:border-sky-500 w-full ${isSuperAdmin ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+                            onClick={() => setOpenUserDropdown(openUserDropdown === acc.username ? null : acc.username)}
+                            className={`bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-sky-400 font-extrabold focus:outline-none w-full text-left flex justify-between items-center ${isSuperAdmin ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
                           >
-                            {availableRoles.map((role) => (
-                              <option key={role} value={role}>{role}</option>
-                            ))}
-                          </select>
+                            <span className="truncate">{acc.role || "No Role"}</span>
+                            <span className="text-[8.5px] text-slate-500">▼</span>
+                          </button>
+
+                          {openUserDropdown === acc.username && isSuperAdmin && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setOpenUserDropdown(null)} />
+                              <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-slate-800 bg-slate-950 p-2.5 shadow-2xl z-20 space-y-1.5 max-h-60 overflow-y-auto">
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-slate-500 px-1.5 pb-1 border-b border-slate-900">
+                                  Select User Roles (Merged)
+                                </div>
+                                {availableRoles.map((role) => {
+                                  const userRoles = (acc.role || "")
+                                    .split(",")
+                                    .map((r) => r.trim().toUpperCase());
+                                  const isChecked = userRoles.includes(role.toUpperCase());
+
+                                  const handleToggleCheckbox = () => {
+                                    let currentRoles = (acc.role || "")
+                                      .split(",")
+                                      .map((r) => r.trim())
+                                      .filter((r) => r !== "");
+                                    
+                                    if (isChecked) {
+                                      currentRoles = currentRoles.filter(
+                                        (r) => r.toLowerCase() !== role.toLowerCase()
+                                      );
+                                    } else {
+                                      currentRoles.push(role);
+                                    }
+                                    
+                                    const nextRoleString = currentRoles.join(", ") || "Stakeholders";
+                                    handleRoleChange(acc.username, nextRoleString);
+                                  };
+
+                                  return (
+                                    <label
+                                      key={role}
+                                      className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-slate-900 cursor-pointer text-slate-350 hover:text-white select-none text-[11px] font-semibold"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={handleToggleCheckbox}
+                                        className="rounded border-slate-800 bg-slate-900 text-sky-500 focus:ring-sky-500"
+                                      />
+                                      <span>{role}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
                         </div>
 
                         <div className="flex justify-end pr-1.5">

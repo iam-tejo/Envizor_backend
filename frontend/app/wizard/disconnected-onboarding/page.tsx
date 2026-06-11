@@ -11,6 +11,22 @@ export default function DisconnectedOnboardingPage() {
   const [createConnection, setCreateConnection] = useState(true);
   const [appName, setAppName] = useState("Billing_East_Portal");
 
+  // Wizard Stepper State
+  const [currentStep, setCurrentStep] = useState(1);
+  const stepsList = [
+    { number: 1, name: "Scraper Settings", desc: "Credentials & URLs", icon: "💻" },
+    { number: 2, name: "Extraction Rules", desc: "Target UI Elements", icon: "📋" },
+    { number: 3, name: "Onboard Connection", desc: "Run Scan & Imports", icon: "📡" },
+    { number: 4, name: "Provision Queue", desc: "Automate & Reconcile", icon: "⚡" }
+  ];
+
+  // Step 2: Access Extraction Rules States
+  const [accountRowSelector, setAccountRowSelector] = useState("table.users-list tr");
+  const [usernameSelector, setUsernameSelector] = useState("td.email");
+  const [roleBadgeSelector, setRoleBadgeSelector] = useState("span.badge-role");
+  const [extractionTimeout, setExtractionTimeout] = useState(8);
+  const [scrapeDeepPages, setScrapeDeepPages] = useState(true);
+
   // Disconnected Connections dropdown states
   const [connections, setConnections] = useState<any[]>([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string>("new");
@@ -56,6 +72,65 @@ export default function DisconnectedOnboardingPage() {
   const [userName, setUserName] = useState("admin");
 
   const [guideExpanded, setGuideExpanded] = useState(true);
+
+  // Load Draft from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const draft = localStorage.getItem("envizor_disconnected_draft");
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.url) setUrl(parsed.url);
+          if (parsed.username) setUsername(parsed.username);
+          if (parsed.appName) setAppName(parsed.appName);
+          if (parsed.selectedConnectionId) setSelectedConnectionId(parsed.selectedConnectionId);
+          if (parsed.createConnection !== undefined) setCreateConnection(parsed.createConnection);
+          
+          if (parsed.accountRowSelector) setAccountRowSelector(parsed.accountRowSelector);
+          if (parsed.usernameSelector) setUsernameSelector(parsed.usernameSelector);
+          if (parsed.roleBadgeSelector) setRoleBadgeSelector(parsed.roleBadgeSelector);
+          if (parsed.extractionTimeout !== undefined) setExtractionTimeout(parsed.extractionTimeout);
+          if (parsed.scrapeDeepPages !== undefined) setScrapeDeepPages(parsed.scrapeDeepPages);
+          
+          if (parsed.currentStep !== undefined) setCurrentStep(parsed.currentStep);
+        } catch (e) {
+          console.error("Failed to load disconnected onboarding draft", e);
+        }
+      }
+    }
+  }, []);
+
+  // Save Draft to localStorage whenever inputs change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const draft = {
+        url,
+        username,
+        appName,
+        selectedConnectionId,
+        createConnection,
+        accountRowSelector,
+        usernameSelector,
+        roleBadgeSelector,
+        extractionTimeout,
+        scrapeDeepPages,
+        currentStep
+      };
+      localStorage.setItem("envizor_disconnected_draft", JSON.stringify(draft));
+    }
+  }, [
+    url,
+    username,
+    appName,
+    selectedConnectionId,
+    createConnection,
+    accountRowSelector,
+    usernameSelector,
+    roleBadgeSelector,
+    extractionTimeout,
+    scrapeDeepPages,
+    currentStep
+  ]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -713,7 +788,8 @@ export default function DisconnectedOnboardingPage() {
           </div>
           
           {mainTab === "operations" ? (
-            <>
+            <div className="flex flex-col gap-6 animate-fadeIn">
+              
               {/* Interactive Onboarding Walkthrough Guide */}
               <div className="rounded-2xl border border-sky-500/20 bg-slate-900/40 overflow-hidden shadow-lg transition-all duration-300">
                 <div 
@@ -751,13 +827,10 @@ export default function DisconnectedOnboardingPage() {
                           </span>
                           <span className="text-lg">💻</span>
                         </div>
-                        <h4 className="text-xs font-bold text-slate-200">Onboard or Select App</h4>
-                        <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                          Choose <strong className="text-slate-350">Onboard New Application</strong> from the dropdown, or select an existing configured profile (e.g., <strong className="text-slate-350">Billing West Portal</strong>).
+                        <h4 className="text-xs font-bold text-slate-200">Scraper Settings</h4>
+                        <p className="text-[10.5px] text-slate-450 leading-relaxed">
+                          Define target login URLs, administrative access credentials, and profile name overrides.
                         </p>
-                        <div className="text-[9px] text-slate-505 pt-1 border-t border-slate-850">
-                          <span className="text-sky-400 font-bold">Action:</span> Use form selector under <strong>1. Target Application Profile</strong>.
-                        </div>
                       </div>
 
                       {/* Step 2 */}
@@ -768,13 +841,10 @@ export default function DisconnectedOnboardingPage() {
                           </span>
                           <span className="text-lg">⏱️</span>
                         </div>
-                        <h4 className="text-xs font-bold text-slate-200">Configure &amp; Schedule</h4>
-                        <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                          Input the target URL, admin username/password, select an auto-import schedule frequency, and check the auto-create checkbox.
+                        <h4 className="text-xs font-bold text-slate-200">Extraction Rules</h4>
+                        <p className="text-[10.5px] text-slate-450 leading-relaxed">
+                          Specify custom HTML element selectors for identifying accounts, usernames, and role details.
                         </p>
-                        <div className="text-[9px] text-slate-505 pt-1 border-t border-slate-850">
-                          <span className="text-sky-400 font-bold">Action:</span> Fill out administrative credentials and select schedule.
-                        </div>
                       </div>
 
                       {/* Step 3 */}
@@ -785,13 +855,10 @@ export default function DisconnectedOnboardingPage() {
                           </span>
                           <span className="text-lg">📡</span>
                         </div>
-                        <h4 className="text-xs font-bold text-slate-200">Connect, Scan &amp; Run</h4>
-                        <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                          Click <strong className="text-slate-350">Connect, Scan &amp; Schedule</strong>. The agent emulates a browser to scrape user accounts and sync with Saviynt.
+                        <h4 className="text-xs font-bold text-slate-200">Connection &amp; Scan</h4>
+                        <p className="text-[10.5px] text-slate-450 leading-relaxed">
+                          Trigger autonomous scanner execution to read current target application membership lists.
                         </p>
-                        <div className="text-[9px] text-slate-505 pt-1 border-t border-slate-850">
-                          <span className="text-sky-400 font-bold">Action:</span> Watch live stdout execution in the <strong>stdout console terminal</strong>.
-                        </div>
                       </div>
 
                       {/* Step 4 */}
@@ -802,409 +869,582 @@ export default function DisconnectedOnboardingPage() {
                           </span>
                           <span className="text-lg">⚡</span>
                         </div>
-                        <h4 className="text-xs font-bold text-slate-200">Govern &amp; Reconcile</h4>
-                        <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                          Out-of-compliance tasks from Saviynt populate the queue. Run bulk or individual sync operations to reconcile access.
+                        <h4 className="text-xs font-bold text-slate-200">Reconcile Queue</h4>
+                        <p className="text-[10.5px] text-slate-450 leading-relaxed">
+                          Review pending provisioning requests and push bulk synchronizations to target environments.
                         </p>
-                        <div className="text-[9px] text-slate-505 pt-1 border-t border-slate-850">
-                          <span className="text-sky-400 font-bold">Action:</span> Use actions in the <strong>2. Saviynt Provision Operations Queue</strong>.
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4-Step Wizard Stepper Header */}
+              <div className="mb-2 p-5 rounded-2xl border bg-slate-950/15 backdrop-blur-md" style={{ borderColor: "var(--border)" }}>
+                <div className="relative flex flex-col md:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
+                  <div className="absolute left-10 right-10 top-[20px] hidden md:block h-0.5 bg-slate-800 -translate-y-1/2 z-0" />
+                  <div className="absolute left-10 right-10 top-[20px] hidden md:block h-0.5 -translate-y-1/2 z-0">
+                    <div 
+                      className="h-full bg-gradient-to-r from-orange-500 to-sky-500 transition-all duration-500"
+                      style={{ width: `${((currentStep - 1) / (stepsList.length - 1)) * 100}%` }}
+                    />
+                  </div>
+
+                  {stepsList.map((s) => {
+                    const isActive = currentStep === s.number;
+                    const isCompleted = currentStep > s.number;
+                    return (
+                      <button
+                        key={s.number}
+                        type="button"
+                        onClick={() => setCurrentStep(s.number)}
+                        className="relative z-10 flex md:flex-col items-center gap-3 md:gap-1.5 group cursor-pointer focus:outline-none"
+                      >
+                        {/* Circle Node */}
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300"
+                          style={{
+                            backgroundColor: isActive 
+                              ? "var(--bg-elevated)" 
+                              : isCompleted 
+                              ? "var(--bg-panel)" 
+                              : "var(--bg-base)",
+                            borderColor: isActive 
+                              ? "var(--accent)" 
+                              : isCompleted 
+                              ? "var(--success)" 
+                              : "var(--border)",
+                            boxShadow: isActive 
+                              ? "0 0 12px var(--accent-glow)" 
+                              : "none",
+                            color: isActive 
+                              ? "var(--accent)" 
+                              : isCompleted 
+                              ? "var(--success)" 
+                              : "var(--text-muted)",
+                          }}
+                        >
+                          {isCompleted ? "✓" : s.icon}
+                        </div>
+                        {/* Text */}
+                        <div className="text-left md:text-center">
+                          <div 
+                            className="text-[10px] font-bold tracking-wide transition-colors duration-300 whitespace-nowrap"
+                            style={{
+                              color: isActive 
+                                ? "var(--text-primary)" 
+                                : isCompleted
+                                ? "var(--text-secondary)"
+                                : "var(--text-muted)"
+                            }}
+                          >
+                            {s.name}
+                          </div>
+                          <div className="text-[8.5px] text-slate-500 hidden md:block">{s.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* STEP 1: Browser & Creds Scraper Settings */}
+              {currentStep === 1 && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 shadow-lg space-y-6 animate-fadeIn">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">Step 1: Scraper Credentials & settings</h3>
+                    <p className="text-[11px] text-slate-400 mt-1">Configure URLs and credentials for target disconnected applications.</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Select Application</label>
+                        <select
+                          value={selectedConnectionId}
+                          onChange={(e) => handleConnectionSelect(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
+                        >
+                          <option value="new">➕ Onboard New Application</option>
+                          {connectionsLoading ? (
+                            <option disabled>Loading connections...</option>
+                          ) : (
+                            connections.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                💻 {c.name.replace(/_/g, " ")} (Saviynt Profile)
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1 animate-fadeIn">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Application Name</label>
+                        <input
+                          type="text"
+                          required
+                          disabled={selectedConnectionId !== "new"}
+                          value={appName}
+                          onChange={(e) => setAppName(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                          placeholder="e.g. Billing_East_Portal"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">System Login URL</label>
+                        <input
+                          type="url"
+                          required
+                          disabled={selectedConnectionId !== "new"}
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Admin Username</label>
+                          <input
+                            type="text"
+                            required
+                            disabled={selectedConnectionId !== "new"}
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Admin Password</label>
+                          <input
+                            type="password"
+                            required
+                            disabled={selectedConnectionId !== "new"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                          />
                         </div>
                       </div>
 
-                    </div>
+                      {selectedConnectionId === "new" ? (
+                        <div className="flex items-center gap-2 pt-2 select-none">
+                          <input
+                            type="checkbox"
+                            id="createConnection"
+                            checked={createConnection}
+                            onChange={(e) => setCreateConnection(e.target.checked)}
+                            className="rounded bg-slate-950 border-slate-800 text-sky-500 focus:ring-0 focus:ring-offset-0 h-4 w-4"
+                          />
+                          <label htmlFor="createConnection" className="text-xs text-slate-350 cursor-pointer">
+                            Auto-create Saviynt profile if missing
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/10 p-3 text-[10px] text-slate-300 leading-normal flex items-start gap-2 animate-fadeIn">
+                          <span className="text-emerald-400">🛡️</span>
+                          <div>
+                            <strong>Credentials Protected (Strategy A):</strong> Credentials are encrypted and stored in Saviynt EIC Core. The AI Agent will dynamically retrieve and decrypt them during scanning.
+                          </div>
+                        </div>
+                      )}
 
-                    <div className="rounded-xl border border-sky-500/20 bg-sky-950/15 p-3 flex items-start gap-2.5">
-                      <span className="text-lg leading-none mt-0.5">⚙️</span>
-                      <div className="text-[11px] text-slate-350 leading-relaxed">
-                        <strong>Behind the Scenes:</strong> The Envizor agent operates headlessly to interact with legacy applications that lack modern APIs. It translates Saviynt's identity requests into emulated UI events, eliminating manual access ticket overhead and maintaining a full audit log in the <strong className="text-sky-400">Agent Audit History</strong> tab.
+                      <div className="rounded-xl border border-slate-800 bg-slate-955 p-3 space-y-1.5">
+                        <div className="text-[9.5px] font-bold uppercase tracking-wider text-sky-450">Browser Settings</div>
+                        <div className="flex items-center gap-4 text-xs text-slate-400 pt-0.5">
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="checkbox" defaultChecked className="rounded text-sky-500" />
+                            Headless Mode
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="checkbox" defaultChecked className="rounded text-sky-500" />
+                            Ignore Cert Errors
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-
-          {/* Top Grid: Forms & Terminal */}
-          <div className="grid md:grid-cols-12 gap-6 items-stretch">
-            
-            {/* Onboarding Credentials Card */}
-            <form 
-              onSubmit={handleOnboard} 
-              className="md:col-span-5 rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-lg flex flex-col justify-between"
-            >
-              <div className="space-y-4">
-                <div className="text-xs font-bold uppercase tracking-wider text-sky-400">
-                  1. Target Application Profile
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Select an existing disconnected application profile or register a new one to automate.
-                </p>
+              )}
 
-                <div className="space-y-1">
-                  <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Select Application</label>
-                  <select
-                    value={selectedConnectionId}
-                    onChange={(e) => handleConnectionSelect(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
-                  >
-                    <option value="new">➕ Onboard New Application</option>
-                    {connectionsLoading ? (
-                      <option disabled>Loading connections...</option>
-                    ) : (
-                      connections.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          💻 {c.name.replace(/_/g, " ")} (Saviynt Profile)
-                        </option>
-                      ))
+              {/* STEP 2: Access Extraction Rules */}
+              {currentStep === 2 && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 shadow-lg space-y-6 animate-fadeIn">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">Step 2: Scraping & Access Extraction Rules</h3>
+                    <p className="text-[11px] text-slate-400 mt-1">Specify CSS selectors or text matches for the agent to extract users and permissions from the target app UI.</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">User Account Row Selector</label>
+                        <input
+                          type="text"
+                          value={accountRowSelector}
+                          onChange={(e) => setAccountRowSelector(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                          placeholder="e.g. table.users-list tr"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Username Cell Selector</label>
+                        <input
+                          type="text"
+                          value={usernameSelector}
+                          onChange={(e) => setUsernameSelector(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                          placeholder="e.g. td.email"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Role/Entitlement Cell Selector</label>
+                        <input
+                          type="text"
+                          value={roleBadgeSelector}
+                          onChange={(e) => setRoleBadgeSelector(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                          placeholder="e.g. span.badge-role"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Scraping Page Timeout (seconds)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="120"
+                          value={extractionTimeout}
+                          onChange={(e) => setExtractionTimeout(Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 select-none">
+                        <input
+                          type="checkbox"
+                          id="scrapeDeepPages"
+                          checked={scrapeDeepPages}
+                          onChange={(e) => setScrapeDeepPages(e.target.checked)}
+                          className="rounded bg-slate-950 border-slate-800 text-sky-500 focus:ring-0 focus:ring-offset-0 h-4 w-4"
+                        />
+                        <label htmlFor="scrapeDeepPages" className="text-xs text-slate-350 cursor-pointer">
+                          Scrape deep subpages for granular group permissions
+                        </label>
+                      </div>
+
+                      <div className="rounded-xl border border-sky-500/20 bg-sky-955/10 p-3 text-[10px] text-slate-300 leading-normal flex items-start gap-2">
+                        <span className="text-sky-400">💡</span>
+                        <div>
+                          <strong>DOM Scraper Strategy:</strong> The agent loads the target site, authenticates, and scrapes user records. It matches extracted roles with corresponding Saviynt entitlements.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Saviynt Onboarding Connections */}
+              {currentStep === 3 && (
+                <div className="grid md:grid-cols-12 gap-6 items-stretch animate-fadeIn">
+                  {/* Onboard scan panel (left) */}
+                  <div className="md:col-span-5 rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-lg flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="text-xs font-bold uppercase tracking-wider text-sky-400">
+                        Step 3: Run Connection Scan
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Initialize the headless agent scan. The agent will connect to <strong>{appName || "Selected App"}</strong>, scrape accounts/access, and register them inside Saviynt.
+                      </p>
+
+                      <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-xl space-y-2.5">
+                        <div className="text-[9.5px] font-black uppercase tracking-wider text-orange-400">Target Settings Summary</div>
+                        <div className="text-xs space-y-1 text-slate-300 font-mono">
+                          <div>Url: <span className="text-slate-400">{url}</span></div>
+                          <div>User: <span className="text-slate-400">{username}</span></div>
+                          <div>Name: <span className="text-slate-400">{appName}</span></div>
+                          <div>Type: <span className="text-slate-400">Disconnected Connection</span></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Onboarding Schedule Option inside Step 3 for new connections */}
+                    {selectedConnectionId === "new" && (
+                      <div className="space-y-3 pt-4 border-t border-slate-800/60 mt-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">⏰</span>
+                          <div>
+                            <div className="text-[9.5px] font-black uppercase tracking-wider text-orange-400">Import Schedule</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: "Every 15 min", value: "*/15 * * * *" },
+                            { label: "Hourly",        value: "0 * * * *" },
+                          ].map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => { setOnboardingCron(opt.value); setOnboardingCustomCron(""); }}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all duration-200 cursor-pointer ${
+                                onboardingCron === opt.value
+                                  ? "bg-orange-500/15 border-orange-500/50 text-orange-300"
+                                  : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </select>
-                </div>
 
-                <div className="space-y-1 animate-fadeIn">
-                  <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Application Name</label>
-                  <input
-                    type="text"
-                    required
-                    disabled={selectedConnectionId !== "new"}
-                    value={appName}
-                    onChange={(e) => setAppName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    placeholder="e.g. Billing_East_Portal"
-                  />
-                </div>
-
-                {selectedConnectionId !== "new" && (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/10 p-2.5 text-[10px] text-slate-300 leading-normal flex items-start gap-2 animate-fadeIn">
-                    <span className="text-emerald-400">🛡️</span>
-                    <div>
-                      <strong>Credentials Protected (Strategy A):</strong> credentials are encrypted and stored in Saviynt EIC Core. The AI Agent will dynamically retrieve and decrypt them during scanning.
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">System Login URL</label>
-                  <input
-                    type="url"
-                    required
-                    disabled={selectedConnectionId !== "new"}
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Admin Username</label>
-                    <input
-                      type="text"
-                      required
-                      disabled={selectedConnectionId !== "new"}
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Admin Password</label>
-                    <input
-                      type="password"
-                      required
-                      disabled={selectedConnectionId !== "new"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                {selectedConnectionId === "new" && (
-                  <div className="flex items-center gap-2 pt-2 select-none">
-                    <input
-                      type="checkbox"
-                      id="createConnection"
-                      checked={createConnection}
-                      onChange={(e) => setCreateConnection(e.target.checked)}
-                      className="rounded bg-slate-950 border-slate-800 text-sky-500 focus:ring-0 focus:ring-offset-0 h-4 w-4"
-                    />
-                    <label htmlFor="createConnection" className="text-xs text-slate-350 cursor-pointer">
-                      Auto-create Saviynt profile if missing
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Inline schedule picker: only shown when onboarding a new app ── */}
-              {selectedConnectionId === "new" && (
-                <div className="space-y-3 pt-4 border-t border-slate-800/60 animate-fadeIn">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">⏰</span>
-                    <div>
-                      <div className="text-[9.5px] font-black uppercase tracking-wider text-orange-400">Import Schedule</div>
-                      <div className="text-[10px] text-slate-500 leading-tight">How often should the agent auto-import data from this app?</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { label: "Every 15 min", value: "*/15 * * * *" },
-                      { label: "Every 30 min", value: "*/30 * * * *" },
-                      { label: "Hourly",        value: "0 * * * *" },
-                      { label: "Daily midnight",value: "0 0 * * *" },
-                    ].map((opt) => (
+                    <div className="pt-5 border-t border-slate-800/80 mt-4 flex items-center justify-between">
                       <button
-                        key={opt.value}
                         type="button"
-                        onClick={() => { setOnboardingCron(opt.value); setOnboardingCustomCron(""); }}
-                        className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 cursor-pointer ${
-                          onboardingCron === opt.value
-                            ? "bg-orange-500/15 border-orange-500/50 text-orange-300"
-                            : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-                        }`}
+                        onClick={handleOnboard}
+                        disabled={onboardLoading}
+                        className={`
+                          w-full px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider
+                          text-white hover:scale-[1.02] active:scale-95 transition-all shadow-md border cursor-pointer
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 border-sky-450
+                        `}
                       >
-                        {onboardingCron === opt.value && <span className="mr-1">✓</span>}{opt.label}
+                        {onboardLoading ? "Running Headless Agent..." : "📡 Connect, Scan & Import"}
                       </button>
-                    ))}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setOnboardingCron("none"); setOnboardingCustomCron(""); }}
-                      className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 cursor-pointer ${
-                        onboardingCron === "none"
-                          ? "bg-orange-500/15 border-orange-500/50 text-orange-300"
-                          : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-                      }`}
-                    >
-                      {onboardingCron === "none" && <span className="mr-1">✓</span>}🚫 No Schedule
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOnboardingCron("custom")}
-                      className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 cursor-pointer ${
-                        onboardingCron === "custom"
-                          ? "bg-orange-500/15 border-orange-500/50 text-orange-300"
-                          : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-                      }`}
-                    >
-                      {onboardingCron === "custom" && <span className="mr-1">✓</span>}Custom Cron
-                    </button>
-                  </div>
-
-                  {onboardingCron === "custom" && (
-                    <input
-                      type="text"
-                      value={onboardingCustomCron}
-                      onChange={(e) => setOnboardingCustomCron(e.target.value)}
-                      placeholder="e.g. */10 * * * *"
-                      className="w-full bg-slate-950 border border-orange-500/30 rounded-xl px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-orange-400 animate-fadeIn"
-                    />
-                  )}
-
-                  {onboardingCron && onboardingCron !== "custom" && (
-                    <div className="text-[10px] text-orange-400/80 font-mono flex items-center gap-1.5">
-                      <span>⚡</span> Agent will import: <strong className="text-orange-300">{translateCronToEnglish(onboardingCron)}</strong>
+                  {/* AI Agent Console Terminal (right) */}
+                  <div className="md:col-span-7 flex flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-lg overflow-hidden min-h-[320px]">
+                    <div className="bg-slate-905 px-4 py-2 border-b border-slate-850 flex items-center justify-between">
+                      <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest">
+                        AI Agent stdout console
+                      </span>
+                      {onboardLoading && (
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-sky-450 animate-pulse">
+                          ⚡ Executing Scan...
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
 
-              <div className="pt-5 border-t border-slate-800/80 mt-4 flex items-center justify-between">
-                <div className="text-[10px] text-slate-500 font-mono">
-                  Strategy: Headless Scraping
-                </div>
-                <button
-                  type="submit"
-                  disabled={onboardLoading || (onboardingCron === "custom" && !onboardingCustomCron.trim() && selectedConnectionId === "new")}
-                  className={`
-                    px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider
-                    text-white hover:scale-[1.03] active:scale-95 transition-all shadow-md border cursor-pointer
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    ${selectedConnectionId === "new"
-                      ? "bg-gradient-to-r from-orange-500 to-sky-500 hover:from-orange-400 hover:to-sky-400 border-orange-400 shadow-orange-500/15"
-                      : "bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 border-sky-400 shadow-sky-500/10"
-                    }
-                  `}
-                >
-                  {onboardLoading
-                    ? "Running Agent..."
-                    : selectedConnectionId === "new"
-                      ? "📡 Connect, Scan & Schedule"
-                      : "📡 Connect & Scan"
-                  }
-                </button>
-              </div>
-            </form>
-
-            {/* AI Agent Console Terminal */}
-            <div className="md:col-span-7 flex flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-lg overflow-hidden min-h-[300px]">
-              {/* Terminal Title Bar */}
-              <div className="bg-slate-900 px-4 py-2 border-b border-slate-850 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-                  </span>
-                  <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest ml-2">
-                    AI Agent stdout console
-                  </span>
-                </div>
-                {onboardLoading && (
-                  <span className="text-[9px] uppercase tracking-wider font-extrabold text-sky-400 animate-pulse flex items-center gap-1.5">
-                    <span className="animate-spin text-[8px]">⟳</span> Executing...
-                  </span>
-                )}
-              </div>
-
-              {/* Terminal Logs viewport */}
-              <div className="flex-1 p-4 font-mono text-[10.5px] leading-relaxed text-slate-350 overflow-y-auto space-y-1.5 select-text select-all">
-                {terminalLogs.map((log, idx) => {
-                  let cls = "text-slate-300";
-                  if (log.startsWith("[ERROR]")) cls = "text-red-400 font-bold";
-                  else if (log.startsWith("[SUCCESS]")) cls = "text-emerald-400 font-bold";
-                  else if (log.includes("Discover") || log.includes("creating") || log.includes("uploading")) cls = "text-sky-300";
-                  else if (log.includes("Authenticated") || log.includes("completed")) cls = "text-emerald-400";
-                  
-                  return (
-                    <div key={idx} className={cls}>
-                      {log}
+                    <div className="flex-1 p-4 font-mono text-[10.5px] leading-relaxed text-slate-350 overflow-y-auto space-y-1.5 select-text select-all">
+                      {terminalLogs.map((log, idx) => {
+                        let cls = "text-slate-300";
+                        if (log.startsWith("[ERROR]")) cls = "text-red-400 font-bold";
+                        else if (log.startsWith("[SUCCESS]")) cls = "text-emerald-400 font-bold";
+                        return <div key={idx} className={cls}>{log}</div>;
+                      })}
+                      <div ref={terminalEndRef} />
                     </div>
-                  );
-                })}
-                <div ref={terminalEndRef} />
-              </div>
 
-              {/* Terminal Footer Info */}
-              {successInfo && (
-                <div className="bg-emerald-950/20 border-t border-emerald-800/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3 animate-fadeIn text-[10.5px]">
-                  <div className="text-slate-300 space-y-1">
-                    <div>
-                      ✅ Scraped Profile: <strong className="text-slate-200">{successInfo.connectionProfile}</strong>
-                    </div>
-                    {successInfo.jobId && (
-                      <div className="text-[10px] text-emerald-400">
-                        ⚡ Saviynt Job ID: <strong className="text-emerald-300 font-mono">{successInfo.jobId}</strong> ({successInfo.jobStatus || "SUCCESS"})
+                    {successInfo && (
+                      <div className="bg-emerald-950/20 border-t border-emerald-800/20 px-4 py-3 flex items-center justify-between gap-3 text-[10.5px]">
+                        <div>
+                          ✅ Scraped Profile: <strong className="text-slate-200">{successInfo.connectionProfile}</strong>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-emerald-950/60 text-emerald-450 border border-emerald-800/40 px-2 py-0.5 rounded font-bold">
+                            {successInfo.scrapedAccountsCount} Accounts
+                          </span>
+                          <span className="bg-emerald-950/60 text-emerald-450 border border-emerald-800/40 px-2 py-0.5 rounded font-bold">
+                            {successInfo.scrapedAccessCount} Entitlements
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded font-bold">
-                      {successInfo.scrapedAccountsCount} Accounts Imported
-                    </span>
-                    <span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 px-2 py-0.5 rounded font-bold">
-                      {successInfo.scrapedAccessCount} Entitlements Scraped
-                    </span>
+                </div>
+              )}
+
+              {/* STEP 4: Provisioning Automation Controls */}
+              {currentStep === 4 && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Operations Queue Table */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-lg space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800/80 pb-3">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">Step 4: Provision Operations Queue</h3>
+                        <p className="text-[11px] text-slate-400 mt-1">Review pending provisioning actions. Run direct bulk or individual reconciliation operations.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleExecuteAll}
+                        disabled={tasksLoading || pendingTasks.length === 0}
+                        className="px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white shadow-md border border-violet-400 disabled:opacity-50 cursor-pointer"
+                      >
+                        ⚡ Run Bulk Provision Operations
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-850 bg-slate-955/60">
+                      <table className="w-full border-collapse text-left text-[11px]">
+                        <thead>
+                          <tr className="border-b border-slate-850 bg-slate-950 text-slate-455 font-bold uppercase tracking-wider">
+                            <th className="px-4 py-3">Task ID</th>
+                            <th className="px-4 py-3">Target Application</th>
+                            <th className="px-4 py-3">Provision Action</th>
+                            <th className="px-4 py-3">Target Account</th>
+                            <th className="px-4 py-3">Payload Details</th>
+                            <th className="px-4 py-3">Execution Status</th>
+                            <th className="px-4 py-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-850 font-medium text-slate-200">
+                          {pendingTasks.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="text-center py-10 text-slate-500">No pending provisioning tasks found in queue.</td>
+                            </tr>
+                          ) : (
+                            pendingTasks.map((task) => (
+                              <tr key={task.id} className="hover:bg-slate-900/30 transition-colors">
+                                <td className="px-4 py-3 font-mono font-bold text-sky-400">{task.id}</td>
+                                <td className="px-4 py-3 text-slate-350">{task.targetSystem}</td>
+                                <td className="px-4 py-3">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase bg-blue-950/40 text-blue-400 border-blue-800/40">
+                                    {task.operation.replace("_", " ")}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 font-mono">{task.accountName}</td>
+                                <td className="px-4 py-3 text-slate-400 font-mono text-[9.5px] truncate max-w-[200px]">{task.details}</td>
+                                <td className="px-4 py-3">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border bg-amber-950/40 text-amber-400 border-amber-800/40">
+                                    {task.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleExecuteTask(task.id)}
+                                    disabled={tasksLoading}
+                                    className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 hover:bg-slate-850 hover:text-white transition text-[10px] font-bold cursor-pointer"
+                                  >
+                                    Reconcile
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Scheduling controls */}
+                  <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800/80 pb-3 gap-4">
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Active Agent Scheduler</div>
+                        <div className="text-sm font-black text-slate-200 mt-0.5">Spring Boot Background Service</div>
+                      </div>
+                      
+                      <div className="min-w-[200px] space-y-1">
+                        <label className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block">Select Application to Schedule</label>
+                        <select
+                          value={selectedScheduleConn}
+                          onChange={(e) => setSelectedScheduleConn(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 cursor-pointer focus:outline-none"
+                        >
+                          {connections.length > 0 ? (
+                            connections.map((c: any) => (
+                              <option key={c.id} value={c.name}>
+                                💻 {c.name.replace(/_/g, " ")}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="Billing_West_Portal">💻 Billing West Portal</option>
+                              <option value="Legacy_HR_Directory">💻 Legacy HR Directory</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-6 items-start">
+                      <div className="flex flex-col gap-1.5 bg-slate-950/30 p-3.5 rounded-xl border border-slate-850/50">
+                        <div className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">Next Sync Window</div>
+                        <div className="text-sm font-mono font-bold text-sky-400 mt-1">
+                          {formatCountdown(scheduleConfig?.schedules?.[selectedScheduleConn]?.secondsRemaining)}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 md:col-span-2 bg-slate-950/30 p-3.5 rounded-xl border border-slate-850/50">
+                        <div className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">Configure Run Schedule</div>
+                        <div className="flex gap-3 mt-1 items-center">
+                          <select
+                            value={selectedFreqOption}
+                            onChange={(e) => setSelectedFreqOption(e.target.value)}
+                            className="bg-slate-955 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 cursor-pointer focus:outline-none flex-1"
+                          >
+                            <option value="none">🚫 No Schedule (Manual Only)</option>
+                            <option value="*/5 * * * *">⏱️ Every 5 minutes</option>
+                            <option value="*/15 * * * *">⏱️ Every 15 minutes</option>
+                            <option value="0 * * * *">⏱️ Every 1 hour</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleCronChange(selectedScheduleConn, selectedFreqOption)}
+                            className="px-4 py-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white rounded-lg text-[10px] font-bold uppercase cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Provision Operations Queue */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-lg space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800/80 pb-3">
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">
-                    2. Saviynt Provision Operations Queue
-                  </h3>
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-800/50 bg-violet-950/20 text-[9px] font-extrabold uppercase tracking-wider text-violet-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
-                    Auto-runs every 15 min
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Pending provision actions from Saviynt's analytics reports — read by the AI agent and executed in bulk in the disconnected app on schedule.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 select-none self-end sm:self-center">
+              {/* Stepper Navigation Controls */}
+              <div className="mt-8 pt-6 border-t flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
                 <button
                   type="button"
-                  onClick={handleExecuteAll}
-                  disabled={tasksLoading || pendingTasks.length === 0}
-                  className="
-                    px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider
-                    bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500
-                    text-white hover:scale-[1.02] active:scale-95 transition-all shadow-md cursor-pointer border border-violet-400
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  "
+                  onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
+                  disabled={currentStep === 1}
+                  className="px-5 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-800/20 transition duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
                 >
-                  ⚡ Run Bulk Provision Operations
+                  ← Back
                 </button>
-              </div>
-            </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto rounded-xl border border-slate-850 bg-slate-950/60 shadow-inner">
-              <table className="w-full border-collapse text-left text-[11px]">
-                <thead>
-                  <tr className="border-b border-slate-850 bg-slate-950 text-slate-450 font-bold uppercase tracking-wider">
-                    <th className="px-4 py-3">Task ID</th>
-                    <th className="px-4 py-3">Target Application</th>
-                    <th className="px-4 py-3">Provision Action</th>
-                    <th className="px-4 py-3">Target Account</th>
-                    <th className="px-4 py-3">Payload Details</th>
-                    <th className="px-4 py-3">Execution Status</th>
-                    <th className="px-4 py-3 text-right">Schedule</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-850 font-medium text-slate-200">
-                  {pendingTasks.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-500 text-[11.5px]">
-                        {tasksLoading ? "Loading task records..." : "No pending provisioning tasks found in analytic report database."}
-                      </td>
-                    </tr>
-                  ) : (
-                    pendingTasks.map((task) => {
-                      const isPending = task.status === "PENDING";
-                      return (
-                        <tr key={task.id} className="hover:bg-slate-900/30 transition-colors">
-                          <td className="px-4 py-3 font-mono font-bold text-sky-400">{task.id}</td>
-                          <td className="px-4 py-3 text-slate-350">{task.targetSystem}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase ${
-                              task.operation.startsWith("CREATE") ? "bg-blue-950/40 text-blue-400 border-blue-800/40" :
-                              task.operation.startsWith("DISABLE") ? "bg-red-950/40 text-red-400 border-red-800/40" :
-                              "bg-purple-950/40 text-purple-400 border-purple-800/40"
-                            }`}>
-                              {task.operation.replace("_", " ")}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono">{task.accountName}</td>
-                          <td className="px-4 py-3 text-slate-400 font-mono text-[9.5px] max-w-[200px] truncate" title={task.details}>{task.details}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
-                              isPending 
-                                ? "bg-amber-950/40 text-amber-400 border-amber-800/40" 
-                                : "bg-emerald-950/40 text-emerald-400 border-emerald-800/40"
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${isPending ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
-                              {task.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {isPending ? (
-                              <span className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-violet-400 font-mono">
-                                <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
-                                Queued · 15 min
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-emerald-400 uppercase font-bold pr-2 font-mono">Provisioned ✓</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                {currentStep < 4 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep((prev) => Math.min(4, prev + 1))}
+                    className="px-6 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg transition duration-200 cursor-pointer"
+                  >
+                    Next Step →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(1);
+                      setMainTab("history"); // Navigate to history logs tab upon finish
+                    }}
+                    className="px-6 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg transition duration-200 cursor-pointer"
+                  >
+                    Finish & View History Logs ✓
+                  </button>
+                )}
+              </div>
+
             </div>
-          </div>
-          </>
           ) : (
             /* Audit logs history tab */
             <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-lg space-y-5 animate-fadeIn">

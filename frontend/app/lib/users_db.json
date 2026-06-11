@@ -1,0 +1,19 @@
+{
+  "users": [
+    {
+      "fullName": "Tejo Vempaty",
+      "email": "vams.idm@gmail.com",
+      "username": "vams.idm@gmail.com",
+      "password": "Welcome123",
+      "role": "PROD Admin"
+    }
+  ],
+  "customRoles": {
+    "vams.idm@gmail.com": "BasicUser"
+  },
+  "permissions": {
+    "vams.idm@gmail.com": [
+      "tile-know-more"
+    ]
+  }
+}

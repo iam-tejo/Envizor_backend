@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import RightDockedChatbot from "@/app/components/chatbot/RightDockedChatbot";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import SideNavigationBar from "./components/SideNavigationBar";
 
 export default function WizardLayout({ children }: { children: React.ReactNode }) {
   const [panelState, setPanelState] = useState<"standard" | "expanded" | "hidden" | null>(null);
@@ -10,9 +11,13 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
 
   // User details & roles states
-  const [userRole, setUserRole] = useState<string>("SuperAdmin");
+  const [userRole, setUserRole] = useState<string>("Administrators");
   const [userName, setUserName] = useState<string>("admin");
   const [userAvatar, setUserAvatar] = useState<string>("👤");
+  const [userPermissions, setUserPermissions] = useState<string[]>(["tile-know-more"]);
+
+  // Mobile layout state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
   // JIT temporal session tracking states
   const [jitActive, setJitActive] = useState<boolean>(false);
@@ -46,7 +51,7 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
       // Resolve up-to-date role from local storage overrides
       const overriddenRoles = localStorage.getItem("envizor_custom_roles");
       const rolesMap = overriddenRoles ? JSON.parse(overriddenRoles) : {};
-      const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (user === "admin" ? "SuperAdmin" : "BasicUser");
+      const latestRole = rolesMap[user.toLowerCase()] || sessionStorage.getItem("envizor_user_role") || (user === "admin" ? "Administrators" : "Stakeholders");
       
       // Sync immediately back into sessionStorage so all child pages share it
       sessionStorage.setItem("envizor_user_role", latestRole);
@@ -56,6 +61,12 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
 
       const savedAvatar = localStorage.getItem(`envizor_user_avatar_${user.toLowerCase()}`) || "👤";
       setUserAvatar(savedAvatar);
+
+      // Load user tile permissions from localStorage
+      const allPerms = localStorage.getItem("envizor_user_permissions");
+      const permsMap = allPerms ? JSON.parse(allPerms) : {};
+      const userPerms = permsMap[user.toLowerCase()] || ["tile-know-more"];
+      setUserPermissions(userPerms);
 
       // Check if there is an unresolved expired JIT modal notification pending
       const expiredModalRole = sessionStorage.getItem("envizor_jit_expired_modal");
@@ -77,6 +88,11 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
     const handleAvatarChange = () => {
       const saved = localStorage.getItem(`envizor_user_avatar_${userName.toLowerCase()}`) || "👤";
       setUserAvatar(saved);
+
+      const allPerms = localStorage.getItem("envizor_user_permissions");
+      const permsMap = allPerms ? JSON.parse(allPerms) : {};
+      const userPerms = permsMap[userName.toLowerCase()] || ["tile-know-more"];
+      setUserPermissions(userPerms);
     };
     window.addEventListener("envizorAvatarChanged", handleAvatarChange);
     window.addEventListener("storage", handleAvatarChange);
@@ -103,16 +119,25 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
         // 2. Revert in custom_roles override mapping
         const customRolesData = localStorage.getItem("envizor_custom_roles") || "{}";
         const customRoles = JSON.parse(customRolesData);
-        customRoles[userName.toLowerCase()] = baseRoleName;
+        const targetBaseRole = baseRoleName === "BasicUser" ? "Stakeholders" : baseRoleName;
+        customRoles[userName.toLowerCase()] = targetBaseRole;
         localStorage.setItem("envizor_custom_roles", JSON.stringify(customRoles));
-
+ 
         // 3. Clear the tile permissions granted during this JIT session
         const permsData = localStorage.getItem("envizor_user_permissions");
-        if (permsData) {
-          const permsMap = JSON.parse(permsData);
-          permsMap[userName.toLowerCase()] = ["tile-know-more"];
-          localStorage.setItem("envizor_user_permissions", JSON.stringify(permsMap));
-        }
+        const permsMap = permsData ? JSON.parse(permsData) : {};
+        permsMap[userName.toLowerCase()] = ["tile-know-more"];
+        localStorage.setItem("envizor_user_permissions", JSON.stringify(permsMap));
+
+        // Sync changes to server database
+        fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customRoles,
+            permissions: permsMap
+          })
+        }).catch((err) => console.error("Error syncing JIT demotion to server:", err));
 
         // 4. Sync session storage role instantly
         sessionStorage.setItem("envizor_user_role", baseRoleName);
@@ -161,7 +186,7 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
         const diffMs = userJit.expiresAt - now;
 
         if (diffMs <= 0) {
-          triggerDemotion(userJit.targetRole, userJit.baseRole || "BasicUser");
+          triggerDemotion(userJit.targetRole, userJit.baseRole || "Stakeholders");
         } else {
           setJitActive(true);
           setJitRole(userJit.targetRole);
@@ -234,6 +259,15 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
       >
         {/* Left Side: Brand Logo & Title */}
         <div className="flex items-center gap-2.5">
+          {viewMode === "mobile" && (
+            <button
+              onClick={() => setMobileSidebarOpen((prev) => !prev)}
+              className="p-1 px-1.5 rounded hover:bg-slate-800/40 text-slate-350 transition cursor-pointer text-xs font-bold border border-slate-800 mr-1"
+              title="Toggle Navigation Menu"
+            >
+              ☰ Menu
+            </button>
+          )}
           <img src="/envizor-robot.png" alt="Envizor" className="w-6 h-6 object-contain animate-pulse" />
           <span 
             className="text-[10px] font-black uppercase tracking-[0.2em] bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent cursor-pointer"
@@ -241,36 +275,6 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
           >
             Envizor Suite
           </span>
-
-          {/* SuperAdmin Admin Console Link */}
-          {userRole === "SuperAdmin" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.location.href = "/wizard/admin"}
-                className="ml-3 px-2.5 py-0.5 rounded border border-sky-850 bg-sky-950/20 text-sky-400 hover:bg-sky-900/20 text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer"
-              >
-                ⚙️ Admin Console
-              </button>
-              <button
-                onClick={() => window.location.href = "/wizard/agent"}
-                className="px-2.5 py-0.5 rounded border border-purple-850 bg-purple-950/20 text-purple-400 hover:bg-purple-900/20 text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer"
-              >
-                🧠 Agent Console
-              </button>
-              <button
-                onClick={() => window.location.href = '/wizard/backend-detail'}
-                className="px-2.5 py-0.5 rounded border border-pink-850 bg-pink-950/20 text-pink-400 hover:bg-pink-900/20 text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer"
-              >
-                📊 Backend Code Detail
-              </button>
-              <button
-                onClick={() => window.location.href = '/wizard/disconnected-onboarding'}
-                className="px-2.5 py-0.5 rounded border border-orange-800 bg-orange-950/20 text-orange-400 hover:bg-orange-900/20 text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer"
-              >
-                🔌 Disconnected Onboarding
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Center/Right Side: Controls */}
@@ -368,6 +372,15 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
 
       {/* Split Panels Container */}
       <div className="flex flex-1 h-[calc(100vh-48px)] overflow-hidden relative">
+        {/* Side Navigation Bar */}
+        <SideNavigationBar
+          userRole={userRole}
+          userPermissions={userPermissions}
+          isOpenMobile={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+          viewMode={viewMode}
+        />
+
         {/* Left panel: Active Sub-pages/Wizard screens */}
         <div className={`h-full overflow-y-auto min-w-0 transition-all duration-300 ${panelState === "expanded" ? "w-0 hidden" : (panelState === "standard" && viewMode === "mobile") ? "w-0 hidden" : "w-full flex-1"}`}>
           {children}
@@ -437,7 +450,7 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed px-2">
                 Your elevated temporal privilege <strong className="text-red-400 font-extrabold uppercase">{lastJitRole}</strong> has expired. 
-                Your role has been safely reverted to <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-350">BasicUser</span>.
+                Your role has been safely reverted to <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-350">Stakeholders</span>.
               </p>
             </div>
 

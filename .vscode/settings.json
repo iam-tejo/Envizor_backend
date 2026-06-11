@@ -1,4 +1,6 @@
 {
     "java.compile.nullAnalysis.mode": "disabled",
-    "workbench.iconTheme": "catppuccin-mocha"
+    "workbench.iconTheme": "catppuccin-mocha",
+      "claude.maxOutputTokens": 200000
+
 }
